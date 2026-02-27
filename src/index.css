@@ -1,0 +1,173 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@import "swiper/css";
+@import "swiper/css/navigation";
+@Wimport "swiper/css/pagination";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* Modern Rustic / Artisan Coffee Theme */
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  
+  --font-sans: 'Poppins', sans-serif;
+  --font-serif: 'Playfair Display', serif;
+  
+  --radius: 0.5rem;
+}
+
+:root {
+  /* ===== Brand Colors (Matched with Navbar) ===== */
+  --primary: 218 41% 25%;          /* #263859 */
+  --primary-foreground: 0 0% 100%; /* white */
+
+  --secondary: 218 41% 32%;        /* #2a4d7f */
+  --secondary-foreground: 0 0% 100%;
+
+  --accent: 218 41% 25%;
+  --accent-foreground: 0 0% 100%;
+
+  /* ===== Neutral / System ===== */
+  --background: 0 0% 100%;         /* white */
+  --foreground: 218 41% 25%;       /* #263859 */
+
+  --muted: 210 40% 96%;            /* slate-100 */
+  --muted-foreground: 215 16% 47%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 218 41% 25%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 218 41% 25%;
+
+  --border: 218 41% 25%;
+  --input: 214 32% 91%;
+  --ring: 218 41% 25%;
+
+  --radius: 0.75rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased selection:bg-primary/20 selection:text-secondary;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold tracking-tight text-secondary;
+  }
+}
+
+/* Tailwind v4 – hide scrollbar but keep scroll */
+.scrollbar-hide {
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* IE / Edge */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;               /* Chrome / Safari */
+}
+
+/* react-responsive-pagination custom style */
+
+.pagination-custom {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pagination-custom li {
+  list-style: none;
+}
+
+.pagination-custom li a {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #fff;
+  color: #333333;
+  box-shadow: 0px 0px 2px rgba(38, 56, 89, 0.24);
+  border-radius: 8px;
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 18px;
+
+  transition: all 0.2s ease;
+}
+
+.pagination-custom li a[aria-label="Previous"],
+.pagination-custom li a[aria-label="Next"] {
+  background: #D4D7DE;
+  color: #263859;
+}
+
+.pagination-custom li a:hover {
+  background: #2F80ED;
+  color: #ffffff;
+}
+
+.pagination-custom li a[aria-label="Previous"]:hover,
+.pagination-custom li a[aria-label="Next"]:hover {
+  background: #bcbec5;
+  color: #263859;
+}
+
+.pagination-custom li.active a {
+  background: #2F80ED;
+  color: #ffffff;
+}
+.pagination-custom li.disabled {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #fff;
+  color: #333333;
+  box-shadow: 0px 0px 2px rgba(38, 56, 89, 0.24);
+  border-radius: 8px;
+  pointer-events: none;
+}
+.pagination-custom li.disabled a {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.rtl-pagination .pagination-custom {
+  direction: rtl;
+}
