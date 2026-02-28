@@ -9,8 +9,9 @@ import { useLocation } from "wouter";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "@/firebase";
 
+// السكيما بقت إيميل بس لأن ده المنطقي
 const schema = z.object({
-  email: z.string().email("Please enter a valid email address"),
+  email: z.string().email("Please enter a valid email"),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -28,106 +29,87 @@ export default function ForgetPassword() {
   const onSubmit = async (values: FormValues) => {
     setIsLoading(true);
     try {
-      // إرسال طلب إعادة التعيين لفايربيز
+      // شغل الفايربيز الحقيقي
       await sendPasswordResetEmail(auth, values.email);
       setEmail(values.email);
-      setStep("verify");
+      setStep("verify"); // هنوديه لصفحة التأكيد
+      alert("Reset link sent to your email! 📧");
     } catch (error: any) {
-      // معالجة الأخطاء الشائعة (Security & UX)
-      if (error.code === "auth/user-not-found") {
-        alert("This email is not registered in our system.");
-      } else if (error.code === "auth/too-many-requests") {
-        alert("Too many requests. Please try again later.");
-      } else {
-        alert("Something went wrong. Please try again.");
-      }
-      console.error("Firebase Error:", error.code);
+      alert(error.message);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#f8fafc] p-4 font-sans">
-      <div className="w-full max-w-md bg-white rounded-[2.5rem] p-6 sm:p-10 shadow-2xl shadow-blue-900/10 border border-blue-50/50">
-        
-        {/* Header Section */}
+    <div className="min-h-screen w-full flex items-center justify-center bg-background p-4 font-sans">
+      <div className="w-full max-w-md bg-white rounded-4xl p-4 sm:p-8 md:p-10 shadow-xl shadow-blue-900/5">
         <div className="flex flex-col items-center justify-center mb-8">
-          <img src={logo} alt="Smart Clinic Logo" className="mb-4 w-20 object-contain" />
-          <h2 className="text-2xl md:text-3xl font-extrabold text-[#1a3a60] mb-2 text-center">
-            {step === "request" ? "Forgot Password?" : "Check Your Email"}
+          <img src={logo} alt="Smart Clinic Logo" className="mb-2 object-contain" />
+          <h2 className="text-2xl md:text-3xl font-bold text-[#1a3a60] mb-2 text-center">
+            {step === "request" ? "Reset Password" : "Check Your Email"}
           </h2>
-          <p className="text-gray-500 text-sm md:text-base text-center px-4">
+          <p className="text-gray-500 text-sm md:text-base text-center">
             {step === "request" 
-              ? "No worries! Enter your email and we'll send you a reset link." 
-              : `A recovery link has been sent to ${email}`}
+              ? "Enter your email to receive a password reset link" 
+              : `We've sent a recovery link to ${email}`}
           </p>
         </div>
 
         {step === "request" ? (
-          <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
+          <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
             <div className="w-full">
-              <div className="relative flex items-center gap-3 bg-[#f0f4f8] rounded-2xl border border-transparent focus-within:border-blue-400 focus-within:bg-white transition-all duration-300 overflow-hidden">
-                <div className="h-14 ps-4 pe-2 flex items-center justify-center text-blue-600/70">
-                  <Mail size={22} />
+              <div className="relative flex items-center gap-3 bg-[#f0f4f8] rounded-xl border border-blue-100 overflow-hidden focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-400 transition-all">
+                <div className="h-14.5 ps-4 pe-3 flex items-center justify-center text-gray-500 bg-[#E1EFF9]">
+                  <Mail size={20} className="text-gray-600" />
                 </div>
-                <div className="flex-1 py-2 pe-4">
-                  <label className="text-[10px] uppercase tracking-wider text-blue-600 font-bold block mb-0.5">Email Address</label>
+                <div className="flex-1 py-2">
+                  <label className="text-xs text-gray-500 font-medium block">Email</label>
                   <input
                     type="email"
                     {...register("email")}
-                    placeholder="name@example.com"
-                    className="w-full bg-transparent border-none outline-none text-[#1a3a60] font-semibold text-sm focus:ring-0 p-0 placeholder:text-gray-400"
+                    placeholder="your-email@example.com"
+                    className="w-full bg-transparent border-none outline-none text-[#1a3a60] font-semibold text-sm focus:ring-0 p-0"
                   />
                 </div>
               </div>
-              {errors.email && (
-                <p className="text-red-500 text-xs font-medium mt-2 ms-2">{errors.email.message}</p>
-              )}
+              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
             </div>
 
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-[#185ba5] hover:bg-[#134885] text-white rounded-2xl py-7 text-base font-bold shadow-xl shadow-blue-500/25 transition-all active:scale-[0.97] disabled:opacity-70"
+              className="w-full bg-[#185ba5] hover:bg-[#134885] text-white rounded-full py-6 text-base font-bold shadow-lg shadow-blue-500/30 transition-all active:scale-[0.98]"
             >
-              {isLoading ? (
-                <span className="flex items-center gap-2">
-                  <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  SENDING LINK...
-                </span>
-              ) : "SEND RESET LINK"}
+              {isLoading ? "SENDING..." : "SEND RESET LINK"}
             </Button>
           </form>
         ) : (
           <div className="space-y-8 flex flex-col items-center">
-            <div className="flex flex-col items-center gap-3 text-green-600 bg-green-50 p-6 rounded-3xl w-full border border-green-100">
-              <div className="bg-green-500 text-white p-2 rounded-full shadow-lg shadow-green-200">
-                <ShieldCheck size={32} />
-              </div>
-              <span className="font-bold">Email Sent Successfully!</span>
+            <div className="flex items-center gap-2 text-green-600 font-medium text-sm bg-green-50 p-4 rounded-xl w-full justify-center">
+              <ShieldCheck size={20} />
+              <span>Link sent successfully!</span>
             </div>
             
-            <p className="text-center text-gray-500 text-sm leading-relaxed">
-              We've sent a secure link to your inbox. Please click it to create a new password, then return here to login.
+            <p className="text-center text-gray-500 text-sm">
+              Please click the link in the email to set a new password, then come back to login.
             </p>
 
             <Button 
               onClick={() => setLocation("/login")}
-              className="w-full bg-[#185ba5] hover:bg-[#134885] text-white rounded-2xl py-7 text-base font-bold transition-all shadow-lg shadow-blue-900/10"
+              className="w-full bg-[#185ba5] hover:bg-[#134885] text-white rounded-full py-6 text-base font-bold transition-all"
             >
-              RETURN TO LOGIN
+              GO TO LOGIN
             </Button>
           </div>
         )}
 
-        {/* Footer */}
-        <div className="mt-8 text-center border-t border-gray-100 pt-6">
+        <div className="mt-8 text-center">
           <button 
             onClick={() => setLocation("/login")}
-            className="text-gray-400 text-sm font-bold hover:text-blue-600 transition-colors flex items-center justify-center gap-2 mx-auto"
+            className="text-gray-500 text-sm font-semibold hover:text-[#1a3a60] flex items-center justify-center gap-2 mx-auto cursor-pointer"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={16} />
             Back to Login
           </button>
         </div>
