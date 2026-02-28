@@ -6,7 +6,7 @@ import { User, Lock, EyeOff, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/auth";
 import { signInUserData } from "@/mock/data/authData";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import logo from "@assets/logo.png";
 
 // Zod schema
@@ -117,13 +117,13 @@ export default function Login() {
           </div>
 
           <div className="flex justify-end">
-            <a
-              href="#"
+            <Link
+              to="/forgot-password"
               className="text-[#d03027] text-sm font-semibold underline decoration-[#d03027]/30 underline-offset-4"
               data-testid="link-forgot-password"
             >
               Forgot Password?
-            </a>
+            </Link>
           </div>
 
           <Button
