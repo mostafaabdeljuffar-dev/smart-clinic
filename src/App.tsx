@@ -5,6 +5,7 @@ import Layout from "./components/layouts/Layout";
 import Home from "./pages/Home";
 import Login from "./pages/auth/Login/Login";
 import { AuthProvider } from "./auth";
+import ForgetPassword from './pages/auth/ForgetPassword/ForgetPassword';
 
 const NotFound = lazy(() => import("./pages/not-found"));
 
@@ -20,6 +21,7 @@ function Router() {
           </Route>
 
           <Route path="/login" component={Login} />
+          <Route path="/forgot-password" component={ForgetPassword} />
 
           <Route component={NotFound} />
         </Switch>
