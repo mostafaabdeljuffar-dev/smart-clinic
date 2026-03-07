@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import AuthContext from './AuthContext'
 import appConfig from '@/configs/app.config'
 import { useSessionUser, useToken } from '@/store/authStore'
-import { apiSignIn, apiSignOut, apiSignUp } from '@/services/AuthService'
+import { apiSignOut, apiSignUp } from '@/services/AuthService'
 import { REDIRECT_URL_KEY } from '@/constants/app.constant'
 import type {
     SignInCredential,
@@ -14,6 +14,8 @@ import type {
 } from '@/@types/auth'
 import type { ReactNode } from 'react'
 import type { NavigateFunction } from 'react-router'
+import { signInWithEmailAndPassword } from 'firebase/auth'
+import { auth } from "@/firebase";
 
 type AuthProviderProps = { children: ReactNode }
 
@@ -77,9 +79,23 @@ function AuthProvider({ children }: AuthProviderProps) {
 
     const signIn = async (values: SignInCredential): AuthResult => {
         try {
-            const resp = await apiSignIn(values)
+            const resp: any = await signInWithEmailAndPassword(auth, values.username, values.password);
             if (resp) {
-                handleSignIn({ accessToken: resp.token }, resp.user)
+                console.log("resp: ", resp);
+                
+                // Transform Firebase user to match our User type
+                const firebaseUser = resp.user;
+                const user: User = {
+                    userId: firebaseUser.uid,
+                    email: firebaseUser.email,
+                    userName: firebaseUser.email?.split('@')[0] || firebaseUser.displayName || 'User',
+                    avatar: firebaseUser.photoURL || null,
+                    authority: ['user']
+                };
+                
+                console.log("Transformed user: ", { accessToken: firebaseUser.stsTokenManager.accessToken }, user);
+                
+                handleSignIn({ accessToken: firebaseUser.stsTokenManager.accessToken }, user)
                 return {
                     status: 'success',
                     message: '',

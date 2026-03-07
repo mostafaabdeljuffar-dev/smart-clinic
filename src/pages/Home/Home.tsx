@@ -1,112 +1,180 @@
-import { auth } from "@/firebase";
-import { useLocation } from "wouter";
-import { LogOut, LayoutDashboard, User as UserIcon, Activity, Calendar } from "lucide-react";
+import { MessageCircle, Calendar, Stethoscope, Star, MapPin, DollarSign } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function Home() {
-  const [, setLocation] = useLocation();
-  
-  // بنجيب بيانات المستخدم الحالي
-  const user = auth.currentUser;
-  
-  // دالة لاستخراج الاسم من الإيميل (شيل أي حاجة من أول الـ @)
-  const userName = user?.email ? user.email.split('@')[0] : "Doctor";
+  const navigate = useNavigate();
 
-  const handleLogout = async () => {
-    try {
-      await auth.signOut();
-      setLocation("/login");
-    } catch (error) {
-      console.error("Logout Error:", error);
+  // Sample doctors data
+  const doctors = [
+    {
+      id: 1,
+      name: "Dr. Ahmed Mohamed",
+      specialty: "Cardiology",
+      department: "Heart & Vascular",
+      price: 150,
+      rating: 4.8,
+      reviews: 124,
+      image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=face",
+      description: "Experienced cardiologist with 15+ years in cardiovascular medicine and patient care."
+    },
+    {
+      id: 2,
+      name: "Dr. Sarah Ahmed",
+      specialty: "Dermatology",
+      department: "Skin Care",
+      price: 120,
+      rating: 4.9,
+      reviews: 89,
+      image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&h=400&fit=crop&crop=face",
+      description: "Specialist in dermatological treatments and cosmetic procedures."
+    },
+    {
+      id: 3,
+      name: "Dr. Mohamed Ali",
+      specialty: "Orthopedics",
+      department: "Bone & Joint",
+      price: 180,
+      rating: 4.7,
+      reviews: 156,
+      image: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&h=400&fit=crop&crop=face",
+      description: "Orthopedic surgeon specializing in sports injuries and joint replacements."
+    },
+    {
+      id: 4,
+      name: "Dr. Fatima Hassan",
+      specialty: "Pediatrics",
+      department: "Children's Health",
+      price: 100,
+      rating: 4.9,
+      reviews: 203,
+      image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=face",
+      description: "Dedicated pediatrician focused on children's health and development."
     }
-  };
+  ];
 
   return (
-    <div className="flex min-h-screen bg-[#f0f4f8] font-sans">
-      {/* Sidebar - القائمة الجانبية */}
-      <aside className="w-64 bg-[#1a3a60] text-white hidden md:flex flex-col shadow-2xl">
-        <div className="p-8 text-center border-b border-blue-800/50">
-          <h1 className="text-xl font-bold tracking-wider">SMART CLINIC</h1>
-          <p className="text-[10px] text-blue-300 mt-1 uppercase tracking-widest">Management System</p>
-        </div>
-        
-        <nav className="flex-1 px-4 py-6 space-y-2">
-          <div className="flex items-center gap-3 p-3 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-600/30">
-            <LayoutDashboard size={20} />
-            <span className="font-semibold text-sm">Dashboard</span>
-          </div>
-          <div className="flex items-center gap-3 p-3 text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all cursor-pointer">
-            <Activity size={20} />
-            <span className="text-sm">Patients</span>
-          </div>
-          <div className="flex items-center gap-3 p-3 text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all cursor-pointer">
-            <Calendar size={20} />
-            <span className="text-sm">Appointments</span>
-          </div>
-        </nav>
+    <div className="min-h-screen bg-gray-50">
+      {/* Hero Section */}
+      <section className="bg-gradient-to-r from-[#1a3a60] to-[#185ba5] text-white py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            {/* Hero Content */}
+            <div className="space-y-6">
+              <h1 className="text-4xl md:text-5xl font-bold leading-tight text-white">
+                Your Health, Our Priority
+              </h1>
+              <p className="text-xl text-blue-100 leading-relaxed">
+                Connect with the best doctors in your area. Book appointments, get expert medical advice,
+                and manage your healthcare journey with ease through our smart clinic platform.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <button
+                  onClick={() => navigate("/doctors")}
+                  className="bg-white text-[#1a3a60] px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
+                >
+                  Find a Doctor
+                </button>
+                <button
+                  onClick={() => navigate("/appointments")}
+                  className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-[#1a3a60] transition-colors"
+                >
+                  Book Appointment
+                </button>
+              </div>
+            </div>
 
-        <div className="p-4 border-t border-blue-800/50">
-          <button 
-            onClick={handleLogout}
-            className="flex items-center justify-center gap-2 w-full bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white py-3 rounded-xl transition-all duration-300 font-bold text-sm border border-red-500/20"
-          >
-            <LogOut size={18} />
-            SIGN OUT
-          </button>
+            {/* Hero Images */}
+            <div className="relative">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 transform hover:scale-105 transition-transform">
+                    <Stethoscope className="w-12 h-12 text-blue-300 mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">Expert Doctors</h3>
+                    <p className="text-blue-100 text-sm">Connect with certified medical professionals</p>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 transform hover:scale-105 transition-transform">
+                    <Calendar className="w-12 h-12 text-green-300 mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">Easy Booking</h3>
+                    <p className="text-blue-100 text-sm">Schedule appointments in minutes</p>
+                  </div>
+                </div>
+                <div className="space-y-4 mt-8">
+                  <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 transform hover:scale-105 transition-transform">
+                    <MessageCircle className="w-12 h-12 text-purple-300 mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">24/7 Support</h3>
+                    <p className="text-blue-100 text-sm">Get help whenever you need it</p>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 transform hover:scale-105 transition-transform">
+                    <Star className="w-12 h-12 text-yellow-300 mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">Quality Care</h3>
+                    <p className="text-blue-100 text-sm">Experience the best healthcare services</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </aside>
+      </section>
 
-      {/* Main Content - المحتوى الأساسي */}
-      <main className="flex-1 p-4 md:p-10 overflow-y-auto">
-        {/* Top Bar */}
-        <header className="flex justify-between items-center mb-10">
-          <div>
-            <h2 className="text-2xl md:text-3xl font-extrabold text-[#1a3a60] capitalize">
-              أهلاً {userName} ✨
+      {/* Doctors Section */}
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-[#1a3a60] mb-4">
+              Meet Our Expert Doctors
             </h2>
-            <p className="text-gray-500 text-sm mt-1">أتمنى لك يوماً سعيداً في عيادتك.</p>
-          </div>
-          
-          <div className="flex items-center gap-3 bg-white p-2 pr-4 rounded-full shadow-sm border border-blue-500/10">
-            <div className="w-10 h-10 bg-[#E1EFF9] rounded-full flex items-center justify-center text-[#1a3a60]">
-              <UserIcon size={20} />
-            </div>
-            <span className="text-xs font-bold text-[#1a3a60] hidden sm:block">Dr. {userName}</span>
-          </div>
-        </header>
-
-        {/* Dashboard Stats - لمحة سريعة */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-3xl shadow-xl shadow-blue-900/5 border border-white flex flex-col justify-between h-40">
-            <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
-              <Activity size={20} />
-            </div>
-            <div>
-              <p className="text-gray-400 text-xs font-bold uppercase">إجمالي المرضى</p>
-              <h3 className="text-3xl font-black text-[#1a3a60]">1,280</h3>
-            </div>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Choose from our qualified healthcare professionals and book your appointment today.
+            </p>
           </div>
 
-          <div className="bg-white p-6 rounded-3xl shadow-xl shadow-blue-900/5 border border-white flex flex-col justify-between h-40">
-            <div className="w-10 h-10 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center">
-              <Calendar size={20} />
-            </div>
-            <div>
-              <p className="text-gray-400 text-xs font-bold uppercase">كشوفات اليوم</p>
-              <h3 className="text-3xl font-black text-[#1a3a60]">24</h3>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {doctors.map((doctor) => (
+              <div key={doctor.id} className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-shadow border border-gray-100 overflow-hidden">
+                <div className="p-6">
+                  <div className="flex flex-col items-center text-center">
+                    <img
+                      src={doctor.image}
+                      alt={doctor.name}
+                      className="w-24 h-24 rounded-full object-cover mb-4 border-4 border-blue-50"
+                    />
+                    <h3 className="text-xl font-bold text-[#1a3a60] mb-1">{doctor.name}</h3>
+                    <p className="text-[#185ba5] font-semibold mb-2">{doctor.specialty}</p>
+                    <div className="flex items-center gap-1 mb-3">
+                      <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                      <span className="text-sm font-medium text-gray-700">{doctor.rating}</span>
+                      <span className="text-sm text-gray-500">({doctor.reviews} reviews)</span>
+                    </div>
+                    <p className="text-gray-600 text-sm mb-4 line-clamp-3">{doctor.description}</p>
+                    <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
+                      <MapPin className="w-4 h-4" />
+                      <span>{doctor.department}</span>
+                    </div>
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-1 text-[#185ba5] font-bold">
+                        <DollarSign className="w-4 h-4" />
+                        <span>{doctor.price}</span>
+                      </div>
+                      <button className="bg-[#185ba5] hover:bg-[#134885] text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                        Book Now
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
 
-          <div className="bg-[#1a3a60] p-6 rounded-3xl shadow-xl shadow-blue-900/20 text-white flex flex-col justify-between h-40">
-             <div className="flex justify-between items-start">
-                <span className="bg-blue-500 text-[10px] px-2 py-1 rounded-md font-bold uppercase">قريباً</span>
-             </div>
-             <div>
-                <p className="text-blue-200 text-xs font-bold uppercase">تنبيهات النظام</p>
-                <h3 className="text-lg font-bold">لا توجد رسائل جديدة</h3>
-             </div>
+          <div className="text-center mt-12">
+            <button
+              onClick={() => navigate("/doctors")}
+              className="bg-[#1a3a60] hover:bg-[#134885] text-white px-8 py-3 rounded-lg font-semibold transition-colors"
+            >
+              View All Doctors
+            </button>
           </div>
         </div>
-      </main>
+      </section>
     </div>
   );
 }

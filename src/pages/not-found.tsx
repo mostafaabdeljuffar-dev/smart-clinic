@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Link } from "wouter";
+import { Link } from "react-router-dom";
 import { Home } from "lucide-react";
 
 export default function NotFound() {
@@ -29,7 +29,7 @@ export default function NotFound() {
         </div>
 
         <div className="pt-4">
-          <Link href="/">
+          <Link to="/">
             <Button size="lg" className="rounded-full bg-primary hover:bg-primary/90 px-8 cursor-pointer">
               <Home className="mr-2 h-5 w-5" />
               Return Home

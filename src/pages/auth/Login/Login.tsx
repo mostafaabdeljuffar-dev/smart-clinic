@@ -4,10 +4,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { User, Lock, EyeOff, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useLocation, Link } from "wouter"; // ضفنا Link هنا
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/firebase";
+import { Link, useNavigate } from "react-router-dom";
 import logo from "@assets/logo.png";
+import { useAuth } from "@/auth";
 
 const loginSchema = z.object({
   username: z.string().email("Enter a valid email"),
@@ -28,15 +27,15 @@ export default function Login() {
     resolver: zodResolver(loginSchema),
   });
 
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
+  const { signIn } = useAuth();
 
   const onSubmit = async (values: LoginFormValues) => {
     const { username, password } = values;
     setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, username, password);
-      console.log("Logged in successfully!");
-      setLocation("/");
+      await signIn({ username, password });
+      navigate("/");
     } catch (error: any) {
       console.log("Firebase Error:", error.code);
       alert(error.message);
@@ -104,10 +103,8 @@ export default function Login() {
 
           {/* Forget Password (تعديل مصطفى اللي دمجناه) */}
           <div className="flex justify-end">
-            <Link href="/forgot-password">
-              <a className="text-sm font-semibold text-[#185ba5] hover:underline">
-                Forgot Password?
-              </a>
+            <Link to="/forgot-password" className="text-sm font-semibold text-[#185ba5] hover:underline">
+              Forgot Password?
             </Link>
           </div>
 
@@ -119,6 +116,17 @@ export default function Login() {
             {isLoading ? "Logging in..." : "LOG IN"}
           </Button>
         </form>
+
+        <div className="mt-8 text-center text-sm font-medium text-gray-600">
+          Don't have an account?{" "}
+          <Link
+            to="/register"
+            className="text-[#185ba5] font-bold hover:underline decoration-blue-500/30 underline-offset-4"
+            data-testid="link-create-account"
+          >
+            Create Account
+          </Link>
+        </div>
       </div>
     </div>
   );
