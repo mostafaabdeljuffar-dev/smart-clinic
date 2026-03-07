@@ -8,6 +8,9 @@ import { Link, useNavigate } from "react-router-dom";
 import logo from "@assets/logo.png";
 import { useAuth } from "@/auth";
 
+import { auth } from "@/firebase";
+import { signOut } from "firebase/auth";
+
 const loginSchema = z.object({
   username: z.string().email("Enter a valid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -17,7 +20,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false); // ميزة إضافية عشان الـ UX
+  const [isLoading, setIsLoading] = useState(false);
 
   const {
     register,
@@ -33,9 +36,29 @@ export default function Login() {
   const onSubmit = async (values: LoginFormValues) => {
     const { username, password } = values;
     setIsLoading(true);
+
     try {
+      // تسجيل الدخول
       await signIn({ username, password });
+
+      const user = auth.currentUser;
+
+      if (user) {
+        // تحديث بيانات المستخدم من Firebase
+        await user.reload();
+
+        if (!user.emailVerified) {
+          alert("لازم تفعل الإيميل الأول قبل تسجيل الدخول 📩");
+
+          await signOut(auth); // يخرجه من السيشن
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // لو الإيميل متفعل
       navigate("/");
+
     } catch (error: any) {
       console.log("Firebase Error:", error.code);
       alert(error.message);
@@ -47,6 +70,7 @@ export default function Login() {
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-background p-4 font-sans">
       <div className="w-full max-w-md bg-white rounded-4xl p-4 sm:p-8 md:p-10 shadow-xl shadow-blue-900/5">
+        
         <div className="flex flex-col items-center justify-center mb-8">
           <img src={logo} alt="Smart Clinic Logo" className="mb-2 object-contain" />
           <h2 className="text-2xl md:text-3xl font-bold text-[#1a3a60] mb-2 text-center">
@@ -58,14 +82,20 @@ export default function Login() {
         </div>
 
         <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
-          {/* Email Field */}
+
+          {/* Email */}
           <div className="w-full">
             <div className="relative flex items-center gap-3 bg-[#f0f4f8] rounded-xl border border-blue-100 overflow-hidden focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-400 transition-all">
+              
               <div className="h-14.5 ps-4 pe-3 flex items-center justify-center text-gray-500 bg-[#E1EFF9]">
                 <User size={20} className="text-gray-600" />
               </div>
+
               <div className="flex-1 py-2">
-                <label className="text-xs text-gray-500 font-medium block">Email</label>
+                <label className="text-xs text-gray-500 font-medium block">
+                  Email
+                </label>
+
                 <input
                   type="email"
                   {...register("username")}
@@ -73,23 +103,34 @@ export default function Login() {
                 />
               </div>
             </div>
-            {errors.username && <p className="text-red-500 text-xs mt-1">{errors.username.message}</p>}
+
+            {errors.username && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors.username.message}
+              </p>
+            )}
           </div>
 
-          {/* Password Field */}
+          {/* Password */}
           <div className="w-full">
             <div className="relative flex items-center gap-3 bg-[#f0f4f8] rounded-xl border border-blue-100 overflow-hidden focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-400 transition-all">
+
               <div className="h-14.5 ps-4 pe-3 flex items-center justify-center text-gray-500 bg-[#E1EFF9]">
                 <Lock size={20} className="text-gray-600" />
               </div>
+
               <div className="flex-1 py-2">
-                <label className="text-xs text-gray-500 font-medium block">Password</label>
+                <label className="text-xs text-gray-500 font-medium block">
+                  Password
+                </label>
+
                 <input
                   type={showPassword ? "text" : "password"}
                   {...register("password")}
                   className="w-full bg-transparent border-none outline-none text-[#1a3a60] font-bold text-lg tracking-widest focus:ring-0 p-0 h-5"
                 />
               </div>
+
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
@@ -97,13 +138,22 @@ export default function Login() {
               >
                 {showPassword ? <Eye size={20} /> : <EyeOff size={20} />}
               </button>
+
             </div>
-            {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
+
+            {errors.password && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors.password.message}
+              </p>
+            )}
           </div>
 
-          {/* Forget Password (تعديل مصطفى اللي دمجناه) */}
+          {/* Forgot password */}
           <div className="flex justify-end">
-            <Link to="/forgot-password" className="text-sm font-semibold text-[#185ba5] hover:underline">
+            <Link
+              to="/forgot-password"
+              className="text-sm font-semibold text-[#185ba5] hover:underline"
+            >
               Forgot Password?
             </Link>
           </div>
@@ -115,6 +165,7 @@ export default function Login() {
           >
             {isLoading ? "Logging in..." : "LOG IN"}
           </Button>
+
         </form>
 
         <div className="mt-8 text-center text-sm font-medium text-gray-600">
@@ -122,11 +173,11 @@ export default function Login() {
           <Link
             to="/register"
             className="text-[#185ba5] font-bold hover:underline decoration-blue-500/30 underline-offset-4"
-            data-testid="link-create-account"
           >
             Create Account
           </Link>
         </div>
+
       </div>
     </div>
   );
