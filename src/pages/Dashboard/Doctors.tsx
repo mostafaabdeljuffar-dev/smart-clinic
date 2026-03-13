@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
-import { Users, Search, Mail, Phone, Calendar, Trash2, Edit, CheckCircle, XCircle } from "lucide-react";
+import { Search, Mail, Phone, Trash2, Edit, CheckCircle, XCircle, Stethoscope } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,15 +39,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
-// Patient type
-interface Patient {
+// Doctor type
+interface Doctor {
   id: number;
   name: string;
   email: string;
   phone: string;
-  lastVisit: string;
+  specialization: string;
   status: "Active" | "Inactive";
-  studentId?: string;
 }
 
 // Status toggle schema
@@ -55,55 +54,52 @@ const statusSchema = z.object({
   status: z.enum(["Active", "Inactive"]),
 });
 
-// Update patient schema
-const updatePatientSchema = z.object({
+// Update doctor schema
+const updateDoctorSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Please enter a valid email"),
   phone: z.string().min(10, "Phone number must be at least 10 digits"),
-  studentId: z.string().min(1, "Student ID is required"),
+  specialization: z.string().min(2, "Specialization is required"),
 });
 
-// Add patient schema
-const addPatientSchema = z.object({
+// Add doctor schema
+const addDoctorSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Please enter a valid email"),
   phone: z.string().min(10, "Phone number must be at least 10 digits"),
-  studentId: z.string().min(1, "Student ID is required"),
+  specialization: z.string().min(2, "Specialization is required"),
 });
 
 type StatusFormValues = z.infer<typeof statusSchema>;
-type UpdatePatientFormValues = z.infer<typeof updatePatientSchema>;
-type AddPatientFormValues = z.infer<typeof addPatientSchema>;
+type UpdateDoctorFormValues = z.infer<typeof updateDoctorSchema>;
+type AddDoctorFormValues = z.infer<typeof addDoctorSchema>;
 
-export default function Patients() {
-  // Sample patients data
-  const [patients, setPatients] = useState<Patient[]>([
+export default function Doctors() {
+  // Sample doctors data
+  const [doctors, setDoctors] = useState<Doctor[]>([
     {
       id: 1,
-      name: "Ahmed Hassan",
-      email: "ahmed@example.com",
+      name: "Dr. Ahmed Hassan",
+      email: "ahmed.hassan@clinic.com",
       phone: "+20 123 456 7890",
-      lastVisit: "2026-03-05",
-      status: "Active",
-      studentId: "STU001"
+      specialization: "Cardiology",
+      status: "Active"
     },
     {
       id: 2,
-      name: "Fatima Ali",
-      email: "fatima@example.com",
+      name: "Dr. Fatima Ali",
+      email: "fatima.ali@clinic.com",
       phone: "+20 234 567 8901",
-      lastVisit: "2026-03-03",
-      status: "Active",
-      studentId: "STU002"
+      specialization: "Dermatology",
+      status: "Active"
     },
     {
       id: 3,
-      name: "Mohammed Karim",
-      email: "mohammed@example.com",
+      name: "Dr. Mohammed Karim",
+      email: "mohammed.karim@clinic.com",
       phone: "+20 345 678 9012",
-      lastVisit: "2026-02-28",
-      status: "Inactive",
-      studentId: "STU003"
+      specialization: "Orthopedics",
+      status: "Inactive"
     }
   ]);
 
@@ -117,83 +113,84 @@ export default function Patients() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
 
   // Forms
   const statusForm = useForm<StatusFormValues>({
     resolver: zodResolver(statusSchema),
   });
 
-  const updateForm = useForm<UpdatePatientFormValues>({
-    resolver: zodResolver(updatePatientSchema),
+  const updateForm = useForm<UpdateDoctorFormValues>({
+    resolver: zodResolver(updateDoctorSchema),
   });
 
-  const addForm = useForm<AddPatientFormValues>({
-    resolver: zodResolver(addPatientSchema),
+  const addForm = useForm<AddDoctorFormValues>({
+    resolver: zodResolver(addDoctorSchema),
   });
 
   // Filtered and paginated data
-  const filteredPatients = useMemo(() => {
-    return patients.filter(patient =>
-      patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.email.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredDoctors = useMemo(() => {
+    return doctors.filter(doctor =>
+      doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doctor.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doctor.specialization.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [patients, searchTerm]);
+  }, [doctors, searchTerm]);
 
-  const totalPages = Math.ceil(filteredPatients.length / rowsPerPage);
+  const totalPages = Math.ceil(filteredDoctors.length / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
-  const paginatedPatients = filteredPatients.slice(startIndex, startIndex + rowsPerPage);
+  const paginatedDoctors = filteredDoctors.slice(startIndex, startIndex + rowsPerPage);
 
   // Handlers
-  const handleStatusChange = (patient: Patient) => {
-    setSelectedPatient(patient);
-    statusForm.setValue("status", patient.status);
+  const handleStatusChange = (doctor: Doctor) => {
+    setSelectedDoctor(doctor);
+    statusForm.setValue("status", doctor.status);
     setStatusModalOpen(true);
   };
 
   const handleStatusSubmit = (values: StatusFormValues) => {
-    if (selectedPatient) {
-      setPatients(patients.map(p =>
-        p.id === selectedPatient.id
-          ? { ...p, status: values.status }
-          : p
+    if (selectedDoctor) {
+      setDoctors(doctors.map(d =>
+        d.id === selectedDoctor.id
+          ? { ...d, status: values.status }
+          : d
       ));
       setStatusModalOpen(false);
-      setSelectedPatient(null);
+      setSelectedDoctor(null);
     }
   };
 
-  const handleDeleteClick = (patient: Patient) => {
-    setSelectedPatient(patient);
+  const handleDeleteClick = (doctor: Doctor) => {
+    setSelectedDoctor(doctor);
     setDeleteModalOpen(true);
   };
 
   const handleDeleteConfirm = () => {
-    if (selectedPatient) {
-      setPatients(patients.filter(p => p.id !== selectedPatient.id));
+    if (selectedDoctor) {
+      setDoctors(doctors.filter(d => d.id !== selectedDoctor.id));
       setDeleteModalOpen(false);
-      setSelectedPatient(null);
+      setSelectedDoctor(null);
     }
   };
 
-  const handleUpdateClick = (patient: Patient) => {
-    setSelectedPatient(patient);
-    updateForm.setValue("name", patient.name);
-    updateForm.setValue("email", patient.email);
-    updateForm.setValue("phone", patient.phone);
-    updateForm.setValue("studentId", patient.studentId || "");
+  const handleUpdateClick = (doctor: Doctor) => {
+    setSelectedDoctor(doctor);
+    updateForm.setValue("name", doctor.name);
+    updateForm.setValue("email", doctor.email);
+    updateForm.setValue("phone", doctor.phone);
+    updateForm.setValue("specialization", doctor.specialization);
     setUpdateModalOpen(true);
   };
 
-  const handleUpdateSubmit = (values: UpdatePatientFormValues) => {
-    if (selectedPatient) {
-      setPatients(patients.map(p =>
-        p.id === selectedPatient.id
-          ? { ...p, ...values }
-          : p
+  const handleUpdateSubmit = (values: UpdateDoctorFormValues) => {
+    if (selectedDoctor) {
+      setDoctors(doctors.map(d =>
+        d.id === selectedDoctor.id
+          ? { ...d, ...values }
+          : d
       ));
       setUpdateModalOpen(false);
-      setSelectedPatient(null);
+      setSelectedDoctor(null);
     }
   };
 
@@ -202,14 +199,13 @@ export default function Patients() {
     setAddModalOpen(true);
   };
 
-  const handleAddSubmit = (values: AddPatientFormValues) => {
-    const newPatient: Patient = {
-      id: Math.max(...patients.map(p => p.id)) + 1,
+  const handleAddSubmit = (values: AddDoctorFormValues) => {
+    const newDoctor: Doctor = {
+      id: Math.max(...doctors.map(d => d.id)) + 1,
       ...values,
-      lastVisit: new Date().toISOString().split('T')[0],
       status: "Active"
     };
-    setPatients([...patients, newPatient]);
+    setDoctors([...doctors, newDoctor]);
     setAddModalOpen(false);
   };
 
@@ -226,8 +222,8 @@ export default function Patients() {
     <DashboardLayout>
       <div>
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[#1a3a60] mb-2">Patients Management</h1>
-          <p className="text-gray-600">Manage and view all your patients</p>
+          <h1 className="text-3xl font-bold text-[#1a3a60] mb-2">Doctors Management</h1>
+          <p className="text-gray-600">Manage and view all your doctors</p>
         </div>
 
         {/* Search and Filter */}
@@ -237,7 +233,7 @@ export default function Patients() {
               <Search className="absolute left-3 top-3 text-gray-400" size={20} />
               <Input
                 type="text"
-                placeholder="Search patients by name or email..."
+                placeholder="Search doctors by name, email, or specialization..."
                 className="pl-10"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -247,62 +243,62 @@ export default function Patients() {
               className="bg-[#185ba5] hover:bg-[#134885]"
               onClick={handleAddClick}
             >
-              Add Patient
+              Add Doctor
             </Button>
           </div>
         </div>
 
-        {/* Patients Table */}
+        {/* Doctors Table */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
+                <TableHead>Specialization</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedPatients.map((patient) => (
-                <TableRow key={patient.id}>
+              {paginatedDoctors.map((doctor) => (
+                <TableRow key={doctor.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Users size={20} className="text-[#185ba5]" />
+                        <Stethoscope size={20} className="text-[#185ba5]" />
                       </div>
-                      <span className="font-medium text-gray-900">{patient.name}</span>
+                      <span className="font-medium text-gray-900">{doctor.name}</span>
                     </div>
                   </TableCell>
                   <TableCell className="text-gray-600 text-sm flex items-center gap-2">
                     <Mail size={16} className="text-gray-400" />
-                    {patient.email}
+                    {doctor.email}
                   </TableCell>
                   <TableCell className="text-gray-600 text-sm flex items-center gap-2">
                     <Phone size={16} className="text-gray-400" />
-                    {patient.phone}
+                    {doctor.phone}
                   </TableCell>
-                  <TableCell className="text-gray-600 text-sm flex items-center gap-2">
-                    <Calendar size={16} className="text-gray-400" />
-                    {patient.lastVisit}
+                  <TableCell className="text-gray-600 text-sm">
+                    {doctor.specialization}
                   </TableCell>
                   <TableCell>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleStatusChange(patient)}
+                      onClick={() => handleStatusChange(doctor)}
                       className={`${
-                        patient.status === "Active"
+                        doctor.status === "Active"
                           ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200"
                           : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
                       }`}
                     >
-                      {patient.status === "Active" ? (
+                      {doctor.status === "Active" ? (
                         <CheckCircle size={16} className="mr-1" />
                       ) : (
                         <XCircle size={16} className="mr-1" />
                       )}
-                      {patient.status}
+                      {doctor.status}
                     </Button>
                   </TableCell>
                   <TableCell>
@@ -310,7 +306,7 @@ export default function Patients() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleUpdateClick(patient)}
+                        onClick={() => handleUpdateClick(doctor)}
                         className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                       >
                         <Edit size={16} className="mr-1" />
@@ -319,7 +315,7 @@ export default function Patients() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleDeleteClick(patient)}
+                        onClick={() => handleDeleteClick(doctor)}
                         className="text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
                         <Trash2 size={16} className="mr-1" />
@@ -337,9 +333,9 @@ export default function Patients() {
         <Dialog open={statusModalOpen} onOpenChange={setStatusModalOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Change Patient Status</DialogTitle>
+              <DialogTitle>Change Doctor Status</DialogTitle>
               <DialogDescription>
-                Update the status for {selectedPatient?.name}
+                Update the status for {selectedDoctor?.name}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={statusForm.handleSubmit(handleStatusSubmit)}>
@@ -371,9 +367,9 @@ export default function Patients() {
         <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Delete Patient</DialogTitle>
+              <DialogTitle>Delete Doctor</DialogTitle>
               <DialogDescription>
-                Are you sure you want to delete {selectedPatient?.name}? This action cannot be undone.
+                Are you sure you want to delete {selectedDoctor?.name}? This action cannot be undone.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
@@ -387,32 +383,17 @@ export default function Patients() {
           </DialogContent>
         </Dialog>
 
-        {/* Update Patient Modal */}
+        {/* Update Doctor Modal */}
         <Dialog open={updateModalOpen} onOpenChange={setUpdateModalOpen}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>Update Patient</DialogTitle>
+              <DialogTitle>Update Doctor</DialogTitle>
               <DialogDescription>
-                Update patient information for {selectedPatient?.name}
+                Update doctor information for {selectedDoctor?.name}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={updateForm.handleSubmit(handleUpdateSubmit)}>
               <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="studentId" className="text-right">
-                    Student ID
-                  </Label>
-                  <Input
-                    id="studentId"
-                    {...updateForm.register("studentId")}
-                    className="col-span-3"
-                  />
-                  {updateForm.formState.errors.studentId && (
-                    <p className="col-span-4 text-sm text-red-500 text-right">
-                      {updateForm.formState.errors.studentId.message}
-                    </p>
-                  )}
-                </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="name" className="text-right">
                     Name
@@ -459,43 +440,43 @@ export default function Patients() {
                     </p>
                   )}
                 </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="specialization" className="text-right">
+                    Specialization
+                  </Label>
+                  <Input
+                    id="specialization"
+                    {...updateForm.register("specialization")}
+                    className="col-span-3"
+                  />
+                  {updateForm.formState.errors.specialization && (
+                    <p className="col-span-4 text-sm text-red-500 text-right">
+                      {updateForm.formState.errors.specialization.message}
+                    </p>
+                  )}
+                </div>
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setUpdateModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit">Update Patient</Button>
+                <Button type="submit">Update Doctor</Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
 
-        {/* Add Patient Modal */}
+        {/* Add Doctor Modal */}
         <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>Add New Patient</DialogTitle>
+              <DialogTitle>Add New Doctor</DialogTitle>
               <DialogDescription>
-                Add a new patient to the system with their information.
+                Add a new doctor to the system with their information.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={addForm.handleSubmit(handleAddSubmit)}>
               <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="add-studentId" className="text-right">
-                    Student ID
-                  </Label>
-                  <Input
-                    id="add-studentId"
-                    {...addForm.register("studentId")}
-                    className="col-span-3"
-                  />
-                  {addForm.formState.errors.studentId && (
-                    <p className="col-span-4 text-sm text-red-500 text-right">
-                      {addForm.formState.errors.studentId.message}
-                    </p>
-                  )}
-                </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="add-name" className="text-right">
                     Name
@@ -542,12 +523,27 @@ export default function Patients() {
                     </p>
                   )}
                 </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="add-specialization" className="text-right">
+                    Specialization
+                  </Label>
+                  <Input
+                    id="add-specialization"
+                    {...addForm.register("specialization")}
+                    className="col-span-3"
+                  />
+                  {addForm.formState.errors.specialization && (
+                    <p className="col-span-4 text-sm text-red-500 text-right">
+                      {addForm.formState.errors.specialization.message}
+                    </p>
+                  )}
+                </div>
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setAddModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit">Add Patient</Button>
+                <Button type="submit">Add Doctor</Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -573,7 +569,7 @@ export default function Patients() {
           </div>
 
           <div className="text-sm text-gray-600">
-            Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, filteredPatients.length)} of {filteredPatients.length} patients
+            Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, filteredDoctors.length)} of {filteredDoctors.length} doctors
           </div>
 
           <Pagination>

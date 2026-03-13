@@ -1,4 +1,4 @@
-import { LogOut, LayoutDashboard, Activity, Calendar, Menu, X } from "lucide-react";
+import { LogOut, LayoutDashboard, Activity, Calendar, Menu, X, Stethoscope } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/auth";
 import { auth } from "@/firebase";
@@ -44,6 +44,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       path: "/dashboard/patients",
       onClick: () => {
         navigate("/dashboard/patients");
+        setIsSidebarOpen(false);
+      },
+    },
+    {
+      label: "Doctors",
+      icon: Stethoscope,
+      path: "/dashboard/doctors",
+      onClick: () => {
+        navigate("/dashboard/doctors");
         setIsSidebarOpen(false);
       },
     },

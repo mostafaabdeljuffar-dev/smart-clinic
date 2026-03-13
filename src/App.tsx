@@ -18,6 +18,7 @@ const NotFound = lazy(() => import("./pages/not-found"))
 
 // Placeholder pages for dashboard routes
 const Patients = lazy(() => import("./pages/Dashboard/Patients").catch(() => ({ default: () => <div className="p-10"><h1 className="text-2xl font-bold">Patients Management</h1><p className="text-gray-500">Coming soon...</p></div> })))
+const Doctors = lazy(() => import("./pages/Dashboard/Doctors").catch(() => ({ default: () => <div className="p-10"><h1 className="text-2xl font-bold">Doctors Management</h1><p className="text-gray-500">Coming soon...</p></div> })))
 const Appointments = lazy(() => import("./pages/Dashboard/Appointments").catch(() => ({ default: () => <div className="p-10"><h1 className="text-2xl font-bold">Appointments Management</h1><p className="text-gray-500">Coming soon...</p></div> })))
 
 function Router() {
@@ -35,6 +36,7 @@ function Router() {
             {/* Dashboard Routes */}
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/dashboard/patients" element={<Patients />} />
+            <Route path="/dashboard/doctors" element={<Doctors />} />
             <Route path="/dashboard/appointments" element={<Appointments />} />
 
             {/* Auth pages */}
