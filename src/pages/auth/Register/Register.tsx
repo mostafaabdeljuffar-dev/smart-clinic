@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { User, Lock, EyeOff, Eye, Mail, Phone } from "lucide-react";
+import { User, Lock, EyeOff, Eye, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import useAuth from "@/auth/useAuth";
@@ -14,7 +14,6 @@ const registerSchema = z.object({
   username: z.string().optional(),
   name: z.string().optional(),
   email: z.string().email("Enter a valid email"),
-  phone: z.string().optional(),
   specialization: z.string().optional(),
   password: z.string().min(6, "Password must be at least 6 characters"),
   confirmPassword: z.string().min(6, "Confirm password is required"),
@@ -37,14 +36,6 @@ const registerSchema = z.object({
 }, {
   message: "Name must be at least 3 characters",
   path: ["name"],
-}).refine((data) => {
-  if (data.role === 'doctor') {
-    return data.phone && data.phone.length >= 10;
-  }
-  return true;
-}, {
-  message: "Phone number must be at least 10 characters",
-  path: ["phone"],
 }).refine((data) => {
   if (data.role === 'doctor') {
     return data.specialization && data.specialization.length >= 2;
@@ -88,7 +79,6 @@ export default function Register() {
         password: values.password,
         role: values.role,
         ...(values.role === 'doctor' && {
-          phone: values.phone,
           specialization: values.specialization,
         }),
       };
@@ -172,26 +162,6 @@ export default function Register() {
             </div>
             {registerForm.formState.errors.email && <p className="text-red-500 text-xs mt-1">{(registerForm.formState.errors.email as any).message}</p>}
           </div>
-
-          {/* Phone for Doctor */}
-          {role === 'doctor' && (
-            <div className="w-full">
-              <div className="relative flex items-center gap-3 bg-[#f0f4f8] rounded-xl border border-blue-100 overflow-hidden focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-400 transition-all">
-                <div className="h-14.5 ps-4 pe-3 flex items-center justify-center text-gray-500 bg-[#E1EFF9]">
-                  <Phone size={20} className="text-gray-600" />
-                </div>
-                <div className="flex-1 py-2">
-                  <label className="text-xs text-gray-500 font-medium block">Phone Number</label>
-                  <input
-                    type="tel"
-                    {...registerForm.register("phone")}
-                    className="w-full bg-transparent border-none outline-none text-[#1a3a60] font-semibold text-sm focus:ring-0 p-0"
-                  />
-                </div>
-              </div>
-              {registerForm.formState.errors.phone && <p className="text-red-500 text-xs mt-1">{(registerForm.formState.errors.phone as any).message}</p>}
-            </div>
-          )}
 
           {/* Specialization for Doctor */}
           {role === 'doctor' && (
