@@ -13,6 +13,7 @@ import ForgetPassword from "./pages/auth/ForgetPassword/ForgetPassword"
 import { AuthProvider } from "./auth"
 import Register from "./pages/auth/Register/Register"
 import Dashboard from "./pages/Dashboard"
+import DoctorDashboard from "./pages/Doctor/DoctorDashboard"
 
 const NotFound = lazy(() => import("./pages/not-found"))
 
@@ -38,6 +39,9 @@ function Router() {
             <Route path="/dashboard/patients" element={<Patients />} />
             <Route path="/dashboard/doctors" element={<Doctors />} />
             <Route path="/dashboard/appointments" element={<Appointments />} />
+
+            {/* Doctor Dashboard */}
+            <Route path="/doctor-dashboard" element={<DoctorDashboard />} />
 
             {/* Auth pages */}
             <Route path="/login" element={<Login />} />

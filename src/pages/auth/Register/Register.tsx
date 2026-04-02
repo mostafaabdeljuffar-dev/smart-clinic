@@ -1,24 +1,58 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { sendEmailVerification } from "firebase/auth";
-import { User, Lock, EyeOff, Eye, Mail } from "lucide-react";
+import { User, Lock, EyeOff, Eye, Mail, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { auth } from "@/firebase";
+import useAuth from "@/auth/useAuth";
 import logo from "@assets/logo.png";
 
 // Schema
 const registerSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters"),
+  role: z.enum(['user', 'doctor']),
+  username: z.string().optional(),
+  name: z.string().optional(),
   email: z.string().email("Enter a valid email"),
+  phone: z.string().optional(),
+  specialization: z.string().optional(),
   password: z.string().min(6, "Password must be at least 6 characters"),
   confirmPassword: z.string().min(6, "Confirm password is required"),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
+}).refine((data) => {
+  if (data.role === 'user') {
+    return data.username && data.username.length >= 3;
+  }
+  return true;
+}, {
+  message: "Username must be at least 3 characters",
+  path: ["username"],
+}).refine((data) => {
+  if (data.role === 'doctor') {
+    return data.name && data.name.length >= 3;
+  }
+  return true;
+}, {
+  message: "Name must be at least 3 characters",
+  path: ["name"],
+}).refine((data) => {
+  if (data.role === 'doctor') {
+    return data.phone && data.phone.length >= 10;
+  }
+  return true;
+}, {
+  message: "Phone number must be at least 10 characters",
+  path: ["phone"],
+}).refine((data) => {
+  if (data.role === 'doctor') {
+    return data.specialization && data.specialization.length >= 2;
+  }
+  return true;
+}, {
+  message: "Specialization is required",
+  path: ["specialization"],
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -27,34 +61,50 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [role, setRole] = useState<'user' | 'doctor'>('user');
 
   const navigate = useNavigate();
+  const { signUp, user } = useAuth();
 
   const registerForm = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
+    defaultValues: {
+      role: 'user',
+    },
   });
+
+  useEffect(() => {
+    registerForm.reset({
+      role,
+    });
+  }, [role, registerForm]);
 
   const onSubmit = async (values: RegisterFormValues) => {
     setIsLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        values.email,
-        values.password
-      );
-
-      // Save username in displayName
-      await updateProfile(userCredential.user, {
-        displayName: values.username
-      });
-
-      await sendEmailVerification(userCredential.user);
-
-        alert("تم تسجيل الحساب، تحقق من إيميلك لتأكيد الحساب!");
-      navigate("/");
+      const signUpData = {
+        userName: values.role === 'user' ? values.username : values.name,
+        email: values.email,
+        password: values.password,
+        role: values.role,
+        ...(values.role === 'doctor' && {
+          phone: values.phone,
+          specialization: values.specialization,
+        }),
+      };
+      const result = await signUp(signUpData as any);
+      if (result.status === 'success') {
+        // Navigate based on authority
+        if (user?.authority?.includes('doctor')) {
+          navigate('/doctor-dashboard');
+        } else {
+          navigate('/');
+        }
+      } else {
+        alert(result.message);
+      }
     } catch (error: any) {
       alert(error.message);
-      console.log("Firebase Error:", error.code);
     } finally {
       setIsLoading(false);
     }
@@ -68,25 +118,41 @@ export default function Register() {
           <h2 className="text-2xl md:text-3xl font-bold text-[#1a3a60] mb-2 text-center">
             Register
           </h2>
+          <div className="flex gap-4 mb-4">
+            <button
+              type="button"
+              onClick={() => setRole('user')}
+              className={`px-4 py-2 rounded-full font-semibold ${role === 'user' ? 'bg-[#185ba5] text-white' : 'bg-gray-200 text-gray-600'}`}
+            >
+              User
+            </button>
+            <button
+              type="button"
+              onClick={() => setRole('doctor')}
+              className={`px-4 py-2 rounded-full font-semibold ${role === 'doctor' ? 'bg-[#185ba5] text-white' : 'bg-gray-200 text-gray-600'}`}
+            >
+              Doctor
+            </button>
+          </div>
         </div>
 
         <form className="space-y-5" onSubmit={registerForm.handleSubmit(onSubmit)}>
-          {/* Username */}
+          {/* Name/Username */}
           <div className="w-full">
             <div className="relative flex items-center gap-3 bg-[#f0f4f8] rounded-xl border border-blue-100 overflow-hidden focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-400 transition-all">
               <div className="h-14.5 ps-4 pe-3 flex items-center justify-center text-gray-500 bg-[#E1EFF9]">
                 <User size={20} className="text-gray-600" />
               </div>
               <div className="flex-1 py-2">
-                <label className="text-xs text-gray-500 font-medium block">Username</label>
+                <label className="text-xs text-gray-500 font-medium block">{role === 'user' ? 'Username' : 'Name'}</label>
                 <input
                   type="text"
-                  {...registerForm.register("username")}
+                  {...registerForm.register(role === 'user' ? "username" : "name")}
                   className="w-full bg-transparent border-none outline-none text-[#1a3a60] font-semibold text-sm focus:ring-0 p-0"
                 />
               </div>
             </div>
-            {registerForm.formState.errors.username && <p className="text-red-500 text-xs mt-1">{registerForm.formState.errors.username.message}</p>}
+            {registerForm.formState.errors[role === 'user' ? 'username' : 'name'] && <p className="text-red-500 text-xs mt-1">{(registerForm.formState.errors[role === 'user' ? 'username' : 'name'] as any)?.message}</p>}
           </div>
 
           {/* Email */}
@@ -104,8 +170,48 @@ export default function Register() {
                 />
               </div>
             </div>
-            {registerForm.formState.errors.email && <p className="text-red-500 text-xs mt-1">{registerForm.formState.errors.email.message}</p>}
+            {registerForm.formState.errors.email && <p className="text-red-500 text-xs mt-1">{(registerForm.formState.errors.email as any).message}</p>}
           </div>
+
+          {/* Phone for Doctor */}
+          {role === 'doctor' && (
+            <div className="w-full">
+              <div className="relative flex items-center gap-3 bg-[#f0f4f8] rounded-xl border border-blue-100 overflow-hidden focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-400 transition-all">
+                <div className="h-14.5 ps-4 pe-3 flex items-center justify-center text-gray-500 bg-[#E1EFF9]">
+                  <Phone size={20} className="text-gray-600" />
+                </div>
+                <div className="flex-1 py-2">
+                  <label className="text-xs text-gray-500 font-medium block">Phone Number</label>
+                  <input
+                    type="tel"
+                    {...registerForm.register("phone")}
+                    className="w-full bg-transparent border-none outline-none text-[#1a3a60] font-semibold text-sm focus:ring-0 p-0"
+                  />
+                </div>
+              </div>
+              {registerForm.formState.errors.phone && <p className="text-red-500 text-xs mt-1">{(registerForm.formState.errors.phone as any).message}</p>}
+            </div>
+          )}
+
+          {/* Specialization for Doctor */}
+          {role === 'doctor' && (
+            <div className="w-full">
+              <div className="relative flex items-center gap-3 bg-[#f0f4f8] rounded-xl border border-blue-100 overflow-hidden focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-400 transition-all">
+                <div className="h-14.5 ps-4 pe-3 flex items-center justify-center text-gray-500 bg-[#E1EFF9]">
+                  <User size={20} className="text-gray-600" />
+                </div>
+                <div className="flex-1 py-2">
+                  <label className="text-xs text-gray-500 font-medium block">Specialization</label>
+                  <input
+                    type="text"
+                    {...registerForm.register("specialization")}
+                    className="w-full bg-transparent border-none outline-none text-[#1a3a60] font-semibold text-sm focus:ring-0 p-0"
+                  />
+                </div>
+              </div>
+              {registerForm.formState.errors.specialization && <p className="text-red-500 text-xs mt-1">{(registerForm.formState.errors.specialization as any).message}</p>}
+            </div>
+          )}
 
           {/* Password */}
           <div className="w-full">
@@ -129,7 +235,7 @@ export default function Register() {
                 {showPassword ? <Eye size={20} /> : <EyeOff size={20} />}
               </button>
             </div>
-            {registerForm.formState.errors.password && <p className="text-red-500 text-xs mt-1">{registerForm.formState.errors.password.message}</p>}
+            {registerForm.formState.errors.password && <p className="text-red-500 text-xs mt-1">{(registerForm.formState.errors.password as any).message}</p>}
           </div>
 
           {/* Confirm Password */}
@@ -154,7 +260,7 @@ export default function Register() {
                 {showConfirmPassword ? <Eye size={20} /> : <EyeOff size={20} />}
               </button>
             </div>
-            {registerForm.formState.errors.confirmPassword && <p className="text-red-500 text-xs mt-1">{registerForm.formState.errors.confirmPassword.message}</p>}
+            {registerForm.formState.errors.confirmPassword && <p className="text-red-500 text-xs mt-1">{(registerForm.formState.errors.confirmPassword as any).message}</p>}
           </div>
 
           <Button

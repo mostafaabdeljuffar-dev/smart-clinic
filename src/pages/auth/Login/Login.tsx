@@ -8,9 +8,6 @@ import { Link, useNavigate } from "react-router-dom";
 import logo from "@assets/logo.png";
 import { useAuth } from "@/auth";
 
-import { auth } from "@/firebase";
-import { signOut } from "firebase/auth";
-
 const loginSchema = z.object({
   username: z.string().email("Enter a valid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -31,36 +28,25 @@ export default function Login() {
   });
 
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { signIn, user } = useAuth();
 
   const onSubmit = async (values: LoginFormValues) => {
     const { username, password } = values;
     setIsLoading(true);
 
     try {
-      // تسجيل الدخول
-      await signIn({ username, password });
-
-      const user = auth.currentUser;
-
-      if (user) {
-        // تحديث بيانات المستخدم من Firebase
-        await user.reload();
-
-        if (!user.emailVerified) {
-          alert("لازم تفعل الإيميل الأول قبل تسجيل الدخول 📩");
-
-          await signOut(auth); // يخرجه من السيشن
-          setIsLoading(false);
-          return;
+      const result = await signIn({ username, password });
+      if (result.status === 'success') {
+        // Navigate based on authority
+        if (user?.authority?.includes('doctor')) {
+          navigate('/doctor-dashboard');
+        } else {
+          navigate('/');
         }
+      } else {
+        alert(result.message);
       }
-
-      // لو الإيميل متفعل
-      navigate("/");
-
     } catch (error: any) {
-      console.log("Firebase Error:", error.code);
       alert(error.message);
     } finally {
       setIsLoading(false);

@@ -20,6 +20,9 @@ export type SignUpCredential = {
     userName: string
     email: string
     password: string
+    role?: 'user' | 'doctor'
+    phone?: string
+    specialization?: string
 }
 
 export type ForgotPassword = {

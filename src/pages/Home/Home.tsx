@@ -1,4 +1,4 @@
-import { MessageCircle, Calendar, Stethoscope, Star, MapPin, DollarSign } from "lucide-react";
+import { MessageCircle, Calendar, Stethoscope, Star, MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function Home() {
@@ -182,11 +182,11 @@ export default function Home() {
                       <span>{doctor.department}</span>
                     </div>
 
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-1 text-[#185ba5] font-bold">
+                    <div className="flex items-center justify-center w-full">
+                      {/* <div className="flex items-center gap-1 text-[#185ba5] font-bold">
                         <DollarSign className="w-4 h-4" />
                         <span>{doctor.price}</span>
-                      </div>
+                      </div> */}
 
                       <button className="bg-[#185ba5] hover:bg-[#134885] text-white px-4 py-2 rounded-lg font-medium transition-colors">
                         Book Now
