@@ -7,9 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import logo from "@assets/logo.png";
 import { useAuth } from "@/auth";
-// استيراد signOut و auth عشان نطرده لو مش مفعل
-import { signOut } from "firebase/auth";
-import { auth } from "@/firebase";
 
 const loginSchema = z.object({
   username: z.string().email("Enter a valid email"),
@@ -31,7 +28,7 @@ export default function Login() {
   });
 
   const navigate = useNavigate();
-  const { signIn } = useAuth(); // شيلنا user من هنا عشان نضمن نجيب أحدث حالة من auth مباشرة
+  const { signIn, user } = useAuth(); // جبنا user من useAuth
 
   const onSubmit = async (values: LoginFormValues) => {
     const { username, password } = values;
@@ -39,25 +36,20 @@ export default function Login() {
 
     try {
       const result = await signIn({ username, password });
-      
+
       if (result.status === 'success') {
-        // نجيب اليوزر الحالي من firebase مباشرة عشان نتأكد من التفعيل
-        const currentUser = auth.currentUser;
+        // الـ user بييجي من useAuth مش من result
+        const authority = user?.authority ?? [];
 
-        if (currentUser && !currentUser.emailVerified) {
-          // لو مش مفعل، اطرده فوراً
-          await signOut(auth);
-          alert("يا بطل، لازم تفعل حسابك من الإيميل الأول! 📧");
-          setIsLoading(false);
-          return;
-        }
-
-        // لو متفعل، كمل اللوجيك بتاعك القديم زي ما هو
-        if (result.user?.authority?.includes('doctor')) {
+        if (authority.includes('doctor')) {
           navigate('/doctor-dashboard');
+        } else if (authority.includes('admin')) {
+          navigate('/dashboard');
         } else {
           navigate('/');
         }
+      } else if (result.message === 'email_not_verified') {
+        alert("يا بطل، لازم تفعل حسابك من الإيميل الأول! 📧");
       } else {
         alert(result.message);
       }
@@ -87,16 +79,11 @@ export default function Login() {
           {/* Email */}
           <div className="w-full">
             <div className="relative flex items-center gap-3 bg-[#f0f4f8] rounded-xl border border-blue-100 overflow-hidden focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-400 transition-all">
-              
               <div className="h-14.5 ps-4 pe-3 flex items-center justify-center text-gray-500 bg-[#E1EFF9]">
                 <User size={20} className="text-gray-600" />
               </div>
-
               <div className="flex-1 py-2">
-                <label className="text-xs text-gray-500 font-medium block">
-                  Email
-                </label>
-
+                <label className="text-xs text-gray-500 font-medium block">Email</label>
                 <input
                   type="email"
                   {...register("username")}
@@ -104,34 +91,25 @@ export default function Login() {
                 />
               </div>
             </div>
-
             {errors.username && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors.username.message}
-              </p>
+              <p className="text-red-500 text-xs mt-1">{errors.username.message}</p>
             )}
           </div>
 
           {/* Password */}
           <div className="w-full">
             <div className="relative flex items-center gap-3 bg-[#f0f4f8] rounded-xl border border-blue-100 overflow-hidden focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-400 transition-all">
-
               <div className="h-14.5 ps-4 pe-3 flex items-center justify-center text-gray-500 bg-[#E1EFF9]">
                 <Lock size={20} className="text-gray-600" />
               </div>
-
               <div className="flex-1 py-2">
-                <label className="text-xs text-gray-500 font-medium block">
-                  Password
-                </label>
-
+                <label className="text-xs text-gray-500 font-medium block">Password</label>
                 <input
                   type={showPassword ? "text" : "password"}
                   {...register("password")}
                   className="w-full bg-transparent border-none outline-none text-[#1a3a60] font-bold text-lg tracking-widest focus:ring-0 p-0 h-5"
                 />
               </div>
-
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
@@ -139,22 +117,15 @@ export default function Login() {
               >
                 {showPassword ? <Eye size={20} /> : <EyeOff size={20} />}
               </button>
-
             </div>
-
             {errors.password && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors.password.message}
-              </p>
+              <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>
             )}
           </div>
 
           {/* Forgot password */}
           <div className="flex justify-end">
-            <Link
-              to="/forgot-password"
-              className="text-sm font-semibold text-[#185ba5] hover:underline"
-            >
+            <Link to="/forgot-password" className="text-sm font-semibold text-[#185ba5] hover:underline">
               Forgot Password?
             </Link>
           </div>
@@ -171,10 +142,7 @@ export default function Login() {
 
         <div className="mt-8 text-center text-sm font-medium text-gray-600">
           Don't have an account?{" "}
-          <Link
-            to="/register"
-            className="text-[#185ba5] font-bold hover:underline decoration-blue-500/30 underline-offset-4"
-          >
+          <Link to="/register" className="text-[#185ba5] font-bold hover:underline decoration-blue-500/30 underline-offset-4">
             Create Account
           </Link>
         </div>

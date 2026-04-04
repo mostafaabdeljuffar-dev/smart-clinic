@@ -15,25 +15,14 @@ import type {
 import type { ReactNode } from 'react'
 import type { NavigateFunction } from 'react-router'
 import { signInWithEmailAndPassword } from 'firebase/auth'
-import { auth } from "@/firebase";
+import { auth, db } from "@/firebase"
+import { doc, getDoc } from 'firebase/firestore'
 
 type AuthProviderProps = { children: ReactNode }
 
 export type IsolatedNavigatorRef = {
     navigate: NavigateFunction
 }
-
-// const IsolatedNavigator = ({ ref }: { ref: Ref<IsolatedNavigatorRef> }) => {
-//     const navigate = useNavigate()
-
-//     useImperativeHandle(ref, () => {
-//         return {
-//             navigate,
-//         }
-//     }, [navigate])
-
-//     return <></>
-// }
 
 function AuthProvider({ children }: AuthProviderProps) {
     const signedIn = useSessionUser((state) => state.session.signedIn)
@@ -53,19 +42,15 @@ function AuthProvider({ children }: AuthProviderProps) {
         const search = window.location.search
         const params = new URLSearchParams(search)
         const redirectUrl = params.get(REDIRECT_URL_KEY)
-
         navigatorRef.current?.navigate(
             redirectUrl ? redirectUrl : appConfig.authenticatedEntryPath,
         )
     }
 
     const handleSignIn = (tokens: Token, user?: User) => {
-        console.log("user: ", user);
-        
         setToken(tokens.accessToken)
         setTokenState(tokens.accessToken)
         setSessionSignedIn(true)
-
         if (user) {
             setUser(user)
         }
@@ -79,22 +64,37 @@ function AuthProvider({ children }: AuthProviderProps) {
 
     const signIn = async (values: SignInCredential): AuthResult => {
         try {
-            const resp: any = await signInWithEmailAndPassword(auth, values.username, values.password);
+            const resp: any = await signInWithEmailAndPassword(auth, values.username, values.password)
             if (resp) {
-                console.log("resp: ", resp);
-                
-                // Transform Firebase user to match our User type
-                const firebaseUser = resp.user;
+                const firebaseUser = resp.user
+
+                // ── Check email verified ──────────────────────────────────
+                if (!firebaseUser.emailVerified) {
+                    return {
+                        status: 'failed',
+                        message: 'email_not_verified',
+                    }
+                }
+
+                // ── Fetch role from Firestore users collection ────────────
+                let role = 'user'
+                try {
+                    const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
+                    if (userDoc.exists()) {
+                        role = userDoc.data().role ?? 'user'
+                    }
+                } catch {
+                    // keep default role = 'user'
+                }
+
                 const user: User = {
                     userId: firebaseUser.uid,
                     email: firebaseUser.email,
                     userName: firebaseUser.email?.split('@')[0] || firebaseUser.displayName || 'User',
                     avatar: firebaseUser.photoURL || null,
-                    authority: ['user']
-                };
-                
-                console.log("Transformed user: ", { accessToken: firebaseUser.stsTokenManager.accessToken }, user);
-                
+                    authority: [role],
+                }
+
                 handleSignIn({ accessToken: firebaseUser.stsTokenManager.accessToken }, user)
                 return {
                     status: 'success',
@@ -105,7 +105,6 @@ function AuthProvider({ children }: AuthProviderProps) {
                 status: 'failed',
                 message: 'Unable to sign in',
             }
-            // eslint-disable-next-line  @typescript-eslint/no-explicit-any
         } catch (errors: any) {
             return {
                 status: 'failed',
@@ -129,7 +128,6 @@ function AuthProvider({ children }: AuthProviderProps) {
                 status: 'failed',
                 message: 'Unable to sign up',
             }
-            // eslint-disable-next-line  @typescript-eslint/no-explicit-any
         } catch (errors: any) {
             return {
                 status: 'failed',
@@ -146,6 +144,7 @@ function AuthProvider({ children }: AuthProviderProps) {
             navigatorRef.current?.navigate('/')
         }
     }
+
     const oAuthSignIn = (
         callback: (payload: OauthSignInCallbackPayload) => void,
     ) => {
