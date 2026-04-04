@@ -1,10 +1,87 @@
-import { MessageCircle, Calendar, Stethoscope, Star, MapPin } from "lucide-react";
+import { MessageCircle, Calendar, Stethoscope, Star, MapPin, LayoutDashboard } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { auth, db } from "@/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { Loader2 } from "lucide-react";
 
 export default function Home() {
   const navigate = useNavigate();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checking, setChecking] = useState(true);
 
-  // Sample doctors data
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setChecking(false);
+        return;
+      }
+
+      try {
+        // 1. تحقق من الإيميل
+        await user.reload();
+        if (!user.emailVerified) {
+          await signOut(auth);
+          alert("لازم تأكد الإيميل الأول قبل تسجيل الدخول 📧");
+          setChecking(false);
+          return;
+        }
+
+        // 2. جيب بيانات الـ user من Firestore
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+
+        if (!userDoc.exists()) {
+          await signOut(auth);
+          navigate("/unauthorized");
+          return;
+        }
+
+        const userData = userDoc.data();
+        const role = userData.role;
+
+        // 3. تحقق من الـ role
+        if (role === "admin") {
+          setIsAdmin(true);
+
+        } else if (role === "doctor") {
+          // تحقق من الـ status في collection doctors
+          const doctorDoc = await getDoc(doc(db, "doctors", user.uid));
+          if (doctorDoc.exists() && doctorDoc.data().status === "active") {
+            navigate("/doctor-dashboard");
+          } else {
+            await signOut(auth);
+            alert("طلبك كدكتور لسه تحت المراجعة ⏳\nهيتم إشعارك لما يتم القبول");
+          }
+
+        } else if (role === "patient") {
+          // تمام، يفضل في الـ Home
+          
+        } else {
+          // role == pending أو أي حاجة تانية
+          await signOut(auth);
+          navigate("/unauthorized");
+        }
+
+      } catch (error) {
+        console.error(error);
+        navigate("/unauthorized");
+      } finally {
+        setChecking(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  if (checking) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <Loader2 className="animate-spin text-blue-600" size={48} />
+      </div>
+    );
+  }
+
   const doctors = [
     {
       id: 1,
@@ -54,20 +131,32 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+
+      {/* Admin Dashboard Bar */}
+      {isAdmin && (
+        <div className="bg-[#1a3a60] py-2 px-6 flex justify-end">
+          <button
+            onClick={() => navigate("/dashboard")}
+            className="flex items-center gap-2 bg-white text-[#1a3a60] px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors text-sm"
+          >
+            <LayoutDashboard size={18} />
+            Dashboard
+          </button>
+        </div>
+      )}
+
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-[#1a3a60] to-[#185ba5] text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            
+
             <div className="space-y-6">
               <h1 className="text-4xl md:text-5xl font-bold leading-tight text-white">
                 Your Health, Our Priority
               </h1>
-
               <p className="text-xl text-blue-100 leading-relaxed">
                 Connect with the best doctors near you. Book appointments easily and get the medical help you need anytime.
               </p>
-
               <div className="flex flex-col sm:flex-row gap-4">
                 <button
                   onClick={() => navigate("/doctors")}
@@ -75,7 +164,6 @@ export default function Home() {
                 >
                   Find a Doctor
                 </button>
-
                 <button
                   onClick={() => navigate("/appointments")}
                   className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-[#1a3a60] transition-colors"
@@ -85,38 +173,32 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Hero Cards */}
             <div className="relative">
               <div className="grid grid-cols-2 gap-4">
-
                 <div className="space-y-4">
                   <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 transform hover:scale-105 transition-transform">
                     <Stethoscope className="w-12 h-12 text-blue-300 mb-4" />
                     <h3 className="text-lg font-semibold mb-2">Expert Doctors</h3>
                     <p className="text-blue-100 text-sm">Professional doctors ready to help you</p>
                   </div>
-
                   <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 transform hover:scale-105 transition-transform">
                     <Calendar className="w-12 h-12 text-green-300 mb-4" />
                     <h3 className="text-lg font-semibold mb-2">Easy Booking</h3>
                     <p className="text-blue-100 text-sm">Book your appointment quickly</p>
                   </div>
                 </div>
-
                 <div className="space-y-4 mt-8">
                   <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 transform hover:scale-105 transition-transform">
                     <MessageCircle className="w-12 h-12 text-purple-300 mb-4" />
                     <h3 className="text-lg font-semibold mb-2">24/7 Support</h3>
                     <p className="text-blue-100 text-sm">Support team ready anytime</p>
                   </div>
-
                   <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 transform hover:scale-105 transition-transform">
                     <Star className="w-12 h-12 text-yellow-300 mb-4" />
                     <h3 className="text-lg font-semibold mb-2">Quality Care</h3>
                     <p className="text-blue-100 text-sm">Best medical service for patients</p>
                   </div>
                 </div>
-
               </div>
             </div>
 
@@ -127,78 +209,47 @@ export default function Home() {
       {/* Doctors Section */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-[#1a3a60] mb-4">
               Meet Our Expert Doctors
             </h2>
-
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
               Choose a doctor and book your appointment easily.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-
             {doctors.map((doctor) => (
               <div
                 key={doctor.id}
                 className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-shadow border border-gray-100 overflow-hidden"
               >
-
                 <div className="p-6">
                   <div className="flex flex-col items-center text-center">
-
                     <img
                       src={doctor.image}
                       alt={doctor.name}
                       className="w-24 h-24 rounded-full object-cover mb-4 border-4 border-blue-50"
                     />
-
-                    <h3 className="text-xl font-bold text-[#1a3a60] mb-1">
-                      {doctor.name}
-                    </h3>
-
-                    <p className="text-[#185ba5] font-semibold mb-2">
-                      {doctor.specialty}
-                    </p>
-
+                    <h3 className="text-xl font-bold text-[#1a3a60] mb-1">{doctor.name}</h3>
+                    <p className="text-[#185ba5] font-semibold mb-2">{doctor.specialty}</p>
                     <div className="flex items-center gap-1 mb-3">
                       <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                      <span className="text-sm font-medium text-gray-700">
-                        {doctor.rating}
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        ({doctor.reviews} reviews)
-                      </span>
+                      <span className="text-sm font-medium text-gray-700">{doctor.rating}</span>
+                      <span className="text-sm text-gray-500">({doctor.reviews} reviews)</span>
                     </div>
-
-                    <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                      {doctor.description}
-                    </p>
-
+                    <p className="text-gray-600 text-sm mb-4 line-clamp-3">{doctor.description}</p>
                     <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
                       <MapPin className="w-4 h-4" />
                       <span>{doctor.department}</span>
                     </div>
-
-                    <div className="flex items-center justify-center w-full">
-                      {/* <div className="flex items-center gap-1 text-[#185ba5] font-bold">
-                        <DollarSign className="w-4 h-4" />
-                        <span>{doctor.price}</span>
-                      </div> */}
-
-                      <button className="bg-[#185ba5] hover:bg-[#134885] text-white px-4 py-2 rounded-lg font-medium transition-colors">
-                        Book Now
-                      </button>
-                    </div>
-
+                    <button className="bg-[#185ba5] hover:bg-[#134885] text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                      Book Now
+                    </button>
                   </div>
                 </div>
-
               </div>
             ))}
-
           </div>
 
           <div className="text-center mt-12">
@@ -209,7 +260,6 @@ export default function Home() {
               View All Doctors
             </button>
           </div>
-
         </div>
       </section>
     </div>

@@ -1,10 +1,53 @@
 import { Activity, Calendar } from "lucide-react";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { auth, db } from "@/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+import { Loader2 } from "lucide-react";
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        navigate("/unauthorized");
+        return;
+      }
+
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists() && userDoc.data().role === "admin") {
+          setIsAdmin(true);
+        } else {
+          navigate("/unauthorized");
+        }
+      } catch {
+        navigate("/unauthorized");
+      } finally {
+        setChecking(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  if (checking) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <Loader2 className="animate-spin text-blue-600" size={48} />
+      </div>
+    );
+  }
+
+  if (!isAdmin) return null;
+
   return (
     <DashboardLayout>
-      {/* Dashboard Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-3xl shadow-xl shadow-blue-900/5 border border-white flex flex-col justify-between h-40">
           <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">

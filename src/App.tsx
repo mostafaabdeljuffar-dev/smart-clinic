@@ -16,8 +16,8 @@ import Dashboard from "./pages/Dashboard"
 import DoctorDashboard from "./pages/Doctor/DoctorDashboard"
 
 const NotFound = lazy(() => import("./pages/not-found"))
+const Unauthorized = lazy(() => import("./pages/unauthorized"))
 
-// Placeholder pages for dashboard routes
 const Patients = lazy(() => import("./pages/Dashboard/Patients").catch(() => ({ default: () => <div className="p-10"><h1 className="text-2xl font-bold">Patients Management</h1><p className="text-gray-500">Coming soon...</p></div> })))
 const Doctors = lazy(() => import("./pages/Dashboard/Doctors").catch(() => ({ default: () => <div className="p-10"><h1 className="text-2xl font-bold">Doctors Management</h1><p className="text-gray-500">Coming soon...</p></div> })))
 const Appointments = lazy(() => import("./pages/Dashboard/Appointments").catch(() => ({ default: () => <div className="p-10"><h1 className="text-2xl font-bold">Appointments Management</h1><p className="text-gray-500">Coming soon...</p></div> })))
@@ -47,6 +47,9 @@ function Router() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgetPassword />} />
+
+            {/* Unauthorized */}
+            <Route path="/unauthorized" element={<Unauthorized />} />
 
             {/* 404 */}
             <Route path="*" element={<NotFound />} />

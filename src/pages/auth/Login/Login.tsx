@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import logo from "@assets/logo.png";
 import { useAuth } from "@/auth";
+// استيراد signOut و auth عشان نطرده لو مش مفعل
+import { signOut } from "firebase/auth";
+import { auth } from "@/firebase";
 
 const loginSchema = z.object({
   username: z.string().email("Enter a valid email"),
@@ -28,7 +31,7 @@ export default function Login() {
   });
 
   const navigate = useNavigate();
-  const { signIn, user } = useAuth();
+  const { signIn } = useAuth(); // شيلنا user من هنا عشان نضمن نجيب أحدث حالة من auth مباشرة
 
   const onSubmit = async (values: LoginFormValues) => {
     const { username, password } = values;
@@ -36,9 +39,21 @@ export default function Login() {
 
     try {
       const result = await signIn({ username, password });
+      
       if (result.status === 'success') {
-        // Navigate based on authority
-        if (user?.authority?.includes('doctor')) {
+        // نجيب اليوزر الحالي من firebase مباشرة عشان نتأكد من التفعيل
+        const currentUser = auth.currentUser;
+
+        if (currentUser && !currentUser.emailVerified) {
+          // لو مش مفعل، اطرده فوراً
+          await signOut(auth);
+          alert("يا بطل، لازم تفعل حسابك من الإيميل الأول! 📧");
+          setIsLoading(false);
+          return;
+        }
+
+        // لو متفعل، كمل اللوجيك بتاعك القديم زي ما هو
+        if (result.user?.authority?.includes('doctor')) {
           navigate('/doctor-dashboard');
         } else {
           navigate('/');

@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
-import { Users, Search, Mail, Phone, Calendar, Trash2, Edit, CheckCircle, XCircle } from "lucide-react";
+import { Users, Search, Trash2, Edit, Loader2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,146 +20,92 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { db } from "@/firebase";
+import { collection, doc, updateDoc, deleteDoc, onSnapshot, setDoc } from "firebase/firestore";
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 
-// Patient type
 interface Patient {
-  id: number;
+  id: string;
   name: string;
   email: string;
-  phone: string;
-  lastVisit: string;
-  status: "Active" | "Inactive";
+  phone?: string;
   studentId?: string;
+  role?: string;
 }
 
-// Status toggle schema
-const statusSchema = z.object({
-  status: z.enum(["Active", "Inactive"]),
-});
-
-// Update patient schema
 const updatePatientSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Please enter a valid email"),
-  phone: z.string().min(10, "Phone number must be at least 10 digits"),
-  studentId: z.string().min(1, "Student ID is required"),
+  role: z.enum(["patient", "doctor", "admin"]).optional(),
 });
 
-// Add patient schema
-const addPatientSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email("Please enter a valid email"),
-  phone: z.string().min(10, "Phone number must be at least 10 digits"),
-  studentId: z.string().min(1, "Student ID is required"),
+const addUserSchema = z.object({
+  name: z.string().min(2, "الاسم لازم يكون أكتر من حرفين"),
+  email: z.string().email("إيميل مش صحيح"),
+  password: z.string().min(6, "الباسورد لازم يكون 6 أحرف على الأقل"),
+  role: z.enum(["patient", "doctor", "admin"]),
 });
 
-type StatusFormValues = z.infer<typeof statusSchema>;
 type UpdatePatientFormValues = z.infer<typeof updatePatientSchema>;
-type AddPatientFormValues = z.infer<typeof addPatientSchema>;
+type AddUserFormValues = z.infer<typeof addUserSchema>;
 
 export default function Patients() {
-  // Sample patients data
-  const [patients, setPatients] = useState<Patient[]>([
-    {
-      id: 1,
-      name: "Ahmed Hassan",
-      email: "ahmed@example.com",
-      phone: "+20 123 456 7890",
-      lastVisit: "2026-03-05",
-      status: "Active",
-      studentId: "STU001"
-    },
-    {
-      id: 2,
-      name: "Fatima Ali",
-      email: "fatima@example.com",
-      phone: "+20 234 567 8901",
-      lastVisit: "2026-03-03",
-      status: "Active",
-      studentId: "STU002"
-    },
-    {
-      id: 3,
-      name: "Mohammed Karim",
-      email: "mohammed@example.com",
-      phone: "+20 345 678 9012",
-      lastVisit: "2026-02-28",
-      status: "Inactive",
-      studentId: "STU003"
-    }
-  ]);
-
-  // Search and pagination state
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
-
-  // Modal states
-  const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [addLoading, setAddLoading] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-
-  // Forms
-  const statusForm = useForm<StatusFormValues>({
-    resolver: zodResolver(statusSchema),
-  });
 
   const updateForm = useForm<UpdatePatientFormValues>({
     resolver: zodResolver(updatePatientSchema),
   });
 
-  const addForm = useForm<AddPatientFormValues>({
-    resolver: zodResolver(addPatientSchema),
+  const addForm = useForm<AddUserFormValues>({
+    resolver: zodResolver(addUserSchema),
+    defaultValues: { role: "patient" },
   });
 
-  // Filtered and paginated data
-  const filteredPatients = useMemo(() => {
-    return patients.filter(patient =>
-      patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [patients, searchTerm]);
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
+      const patientList = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Patient[];
+      setPatients(patientList);
+      setIsLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
-  const totalPages = Math.ceil(filteredPatients.length / rowsPerPage);
-  const startIndex = (currentPage - 1) * rowsPerPage;
-  const paginatedPatients = filteredPatients.slice(startIndex, startIndex + rowsPerPage);
-
-  // Handlers
-  const handleStatusChange = (patient: Patient) => {
+  const handleUpdateClick = (patient: Patient) => {
     setSelectedPatient(patient);
-    statusForm.setValue("status", patient.status);
-    setStatusModalOpen(true);
+    updateForm.reset({
+      name: patient.name,
+      email: patient.email,
+      role: (patient.role as "patient" | "doctor" | "admin") || "patient",
+    });
+    setUpdateModalOpen(true);
   };
 
-  const handleStatusSubmit = (values: StatusFormValues) => {
-    if (selectedPatient) {
-      setPatients(patients.map(p =>
-        p.id === selectedPatient.id
-          ? { ...p, status: values.status }
-          : p
-      ));
-      setStatusModalOpen(false);
-      setSelectedPatient(null);
+  const handleUpdateSubmit = async (values: UpdatePatientFormValues) => {
+    if (!selectedPatient) return;
+    try {
+      await updateDoc(doc(db, "users", selectedPatient.id), {
+        name: values.name,
+        email: values.email,
+        role: values.role,
+      });
+      setUpdateModalOpen(false);
+      alert("تم تحديث البيانات بنجاح! ✅");
+    } catch (error) {
+      console.error("Update Error:", error);
+      alert("فشل التحديث");
     }
   };
 
@@ -168,447 +114,279 @@ export default function Patients() {
     setDeleteModalOpen(true);
   };
 
-  const handleDeleteConfirm = () => {
-    if (selectedPatient) {
-      setPatients(patients.filter(p => p.id !== selectedPatient.id));
+  const handleDeleteConfirm = async () => {
+    if (!selectedPatient) return;
+    try {
+      await deleteDoc(doc(db, "users", selectedPatient.id));
       setDeleteModalOpen(false);
-      setSelectedPatient(null);
+      alert("تم حذف المستخدم ✅");
+    } catch (error) {
+      alert("خطأ أثناء الحذف");
     }
   };
 
-  const handleUpdateClick = (patient: Patient) => {
-    setSelectedPatient(patient);
-    updateForm.setValue("name", patient.name);
-    updateForm.setValue("email", patient.email);
-    updateForm.setValue("phone", patient.phone);
-    updateForm.setValue("studentId", patient.studentId || "");
-    setUpdateModalOpen(true);
-  };
+  const handleAddSubmit = async (values: AddUserFormValues) => {
+    setAddLoading(true);
+    try {
+      // بنعمل يوزر جديد في Firebase Auth
+      const tempAuth = getAuth();
+      const userCredential = await createUserWithEmailAndPassword(
+        tempAuth,
+        values.email,
+        values.password
+      );
 
-  const handleUpdateSubmit = (values: UpdatePatientFormValues) => {
-    if (selectedPatient) {
-      setPatients(patients.map(p =>
-        p.id === selectedPatient.id
-          ? { ...p, ...values }
-          : p
-      ));
-      setUpdateModalOpen(false);
-      setSelectedPatient(null);
+      const newUser = userCredential.user;
+
+      // بنحط بياناته في Firestore
+      await setDoc(doc(db, "users", newUser.uid), {
+        uid: newUser.uid,
+        name: values.name,
+        email: values.email,
+        role: values.role,
+        status: "active",
+        createdAt: new Date(),
+      });
+
+      addForm.reset();
+      setAddModalOpen(false);
+      alert("تم إضافة المستخدم بنجاح! ✅");
+    } catch (error: any) {
+      console.error("Add Error:", error);
+      if (error.code === "auth/email-already-in-use") {
+        alert("الإيميل ده مستخدم بالفعل ❌");
+      } else {
+        alert("فشل الإضافة: " + error.message);
+      }
+    } finally {
+      setAddLoading(false);
     }
   };
 
-  const handleAddClick = () => {
-    addForm.reset();
-    setAddModalOpen(true);
-  };
+  const filteredPatients = useMemo(() => {
+    return patients.filter(
+      (p) =>
+        p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [patients, searchTerm]);
 
-  const handleAddSubmit = (values: AddPatientFormValues) => {
-    const newPatient: Patient = {
-      id: Math.max(...patients.map(p => p.id)) + 1,
-      ...values,
-      lastVisit: new Date().toISOString().split('T')[0],
-      status: "Active"
-    };
-    setPatients([...patients, newPatient]);
-    setAddModalOpen(false);
-  };
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  const handleRowsPerPageChange = (value: string) => {
-    setRowsPerPage(parseInt(value));
-    setCurrentPage(1);
-  };
+  if (isLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <Loader2 className="animate-spin text-blue-600" size={48} />
+      </div>
+    );
+  }
 
   return (
     <DashboardLayout>
-      <div>
+      <div className="p-4">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[#1a3a60] mb-2">Patients Management</h1>
-          <p className="text-gray-600">Manage and view all your patients</p>
+          <h1 className="text-3xl font-bold text-[#1a3a60] mb-2">إدارة المستخدمين</h1>
+          <p className="text-gray-600">عرض وتعديل بيانات المسجلين من Firestore</p>
         </div>
 
-        {/* Search and Filter */}
+        {/* Search + Add Button */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
           <div className="flex gap-4 flex-col md:flex-row">
-            <div className="flex-1 relative">
+            <div className="relative flex-1">
               <Search className="absolute left-3 top-3 text-gray-400" size={20} />
               <Input
-                type="text"
-                placeholder="Search patients by name or email..."
+                placeholder="ابحث بالاسم أو الإيميل..."
                 className="pl-10"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
             <Button
-              className="bg-[#185ba5] hover:bg-[#134885]"
-              onClick={handleAddClick}
+              className="bg-[#185ba5] hover:bg-[#134885] text-white flex items-center gap-2"
+              onClick={() => { addForm.reset({ role: "patient" }); setAddModalOpen(true); }}
             >
-              Add Patient
+              <UserPlus size={18} />
+              إضافة مستخدم
             </Button>
           </div>
         </div>
 
-        {/* Patients Table */}
+        {/* Table */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead>الاسم</TableHead>
+                <TableHead>الإيميل</TableHead>
+                <TableHead>الدور</TableHead>
+                <TableHead>العمليات</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedPatients.map((patient) => (
-                <TableRow key={patient.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Users size={20} className="text-[#185ba5]" />
-                      </div>
-                      <span className="font-medium text-gray-900">{patient.name}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-gray-600 text-sm flex items-center gap-2">
-                    <Mail size={16} className="text-gray-400" />
-                    {patient.email}
-                  </TableCell>
-                  <TableCell className="text-gray-600 text-sm flex items-center gap-2">
-                    <Phone size={16} className="text-gray-400" />
-                    {patient.phone}
-                  </TableCell>
-                  <TableCell className="text-gray-600 text-sm flex items-center gap-2">
-                    <Calendar size={16} className="text-gray-400" />
-                    {patient.lastVisit}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleStatusChange(patient)}
-                      className={`${
-                        patient.status === "Active"
-                          ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200"
-                          : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
-                      }`}
-                    >
-                      {patient.status === "Active" ? (
-                        <CheckCircle size={16} className="mr-1" />
-                      ) : (
-                        <XCircle size={16} className="mr-1" />
-                      )}
-                      {patient.status}
-                    </Button>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleUpdateClick(patient)}
-                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                      >
-                        <Edit size={16} className="mr-1" />
-                        Update
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteClick(patient)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 size={16} className="mr-1" />
-                        Delete
-                      </Button>
-                    </div>
+              {filteredPatients.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-gray-400 py-10">
+                    لا يوجد مستخدمين
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                filteredPatients.map((patient) => (
+                  <TableRow key={patient.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <Users size={18} className="text-blue-500" />
+                        {patient.name}
+                      </div>
+                    </TableCell>
+                    <TableCell>{patient.email}</TableCell>
+                    <TableCell>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          patient.role === "doctor"
+                            ? "bg-purple-100 text-purple-700"
+                            : patient.role === "admin"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-blue-100 text-blue-700"
+                        }`}
+                      >
+                        {patient.role || "patient"}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUpdateClick(patient)}
+                          className="text-blue-600"
+                        >
+                          <Edit size={14} className="mr-1" /> تعديل
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteClick(patient)}
+                          className="text-red-600"
+                        >
+                          <Trash2 size={14} className="mr-1" /> حذف
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </div>
 
-        {/* Status Change Modal */}
-        <Dialog open={statusModalOpen} onOpenChange={setStatusModalOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Change Patient Status</DialogTitle>
-              <DialogDescription>
-                Update the status for {selectedPatient?.name}
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={statusForm.handleSubmit(handleStatusSubmit)}>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="status" className="text-right">
-                    Status
-                  </Label>
-                  <select
-                    {...statusForm.register("status")}
-                    className="col-span-3 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                  </select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setStatusModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit">Update Status</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {/* Delete Confirmation Modal */}
-        <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Delete Patient</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to delete {selectedPatient?.name}? This action cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setDeleteModalOpen(false)}>
-                No
-              </Button>
-              <Button variant="destructive" onClick={handleDeleteConfirm}>
-                Yes, Delete
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Update Patient Modal */}
-        <Dialog open={updateModalOpen} onOpenChange={setUpdateModalOpen}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Update Patient</DialogTitle>
-              <DialogDescription>
-                Update patient information for {selectedPatient?.name}
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={updateForm.handleSubmit(handleUpdateSubmit)}>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="studentId" className="text-right">
-                    Student ID
-                  </Label>
-                  <Input
-                    id="studentId"
-                    {...updateForm.register("studentId")}
-                    className="col-span-3"
-                  />
-                  {updateForm.formState.errors.studentId && (
-                    <p className="col-span-4 text-sm text-red-500 text-right">
-                      {updateForm.formState.errors.studentId.message}
-                    </p>
-                  )}
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="name" className="text-right">
-                    Name
-                  </Label>
-                  <Input
-                    id="name"
-                    {...updateForm.register("name")}
-                    className="col-span-3"
-                  />
-                  {updateForm.formState.errors.name && (
-                    <p className="col-span-4 text-sm text-red-500 text-right">
-                      {updateForm.formState.errors.name.message}
-                    </p>
-                  )}
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="email" className="text-right">
-                    Email
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    {...updateForm.register("email")}
-                    className="col-span-3"
-                  />
-                  {updateForm.formState.errors.email && (
-                    <p className="col-span-4 text-sm text-red-500 text-right">
-                      {updateForm.formState.errors.email.message}
-                    </p>
-                  )}
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="phone" className="text-right">
-                    Phone
-                  </Label>
-                  <Input
-                    id="phone"
-                    {...updateForm.register("phone")}
-                    className="col-span-3"
-                  />
-                  {updateForm.formState.errors.phone && (
-                    <p className="col-span-4 text-sm text-red-500 text-right">
-                      {updateForm.formState.errors.phone.message}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setUpdateModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit">Update Patient</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {/* Add Patient Modal */}
+        {/* Add User Modal */}
         <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New Patient</DialogTitle>
+              <DialogTitle>إضافة مستخدم جديد</DialogTitle>
               <DialogDescription>
-                Add a new patient to the system with their information.
+                سيتم إنشاء حساب جديد في Firebase Auth وإضافة البيانات في Firestore
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={addForm.handleSubmit(handleAddSubmit)}>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="add-studentId" className="text-right">
-                    Student ID
-                  </Label>
-                  <Input
-                    id="add-studentId"
-                    {...addForm.register("studentId")}
-                    className="col-span-3"
-                  />
-                  {addForm.formState.errors.studentId && (
-                    <p className="col-span-4 text-sm text-red-500 text-right">
-                      {addForm.formState.errors.studentId.message}
-                    </p>
-                  )}
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="add-name" className="text-right">
-                    Name
-                  </Label>
-                  <Input
-                    id="add-name"
-                    {...addForm.register("name")}
-                    className="col-span-3"
-                  />
-                  {addForm.formState.errors.name && (
-                    <p className="col-span-4 text-sm text-red-500 text-right">
-                      {addForm.formState.errors.name.message}
-                    </p>
-                  )}
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="add-email" className="text-right">
-                    Email
-                  </Label>
-                  <Input
-                    id="add-email"
-                    type="email"
-                    {...addForm.register("email")}
-                    className="col-span-3"
-                  />
-                  {addForm.formState.errors.email && (
-                    <p className="col-span-4 text-sm text-red-500 text-right">
-                      {addForm.formState.errors.email.message}
-                    </p>
-                  )}
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="add-phone" className="text-right">
-                    Phone
-                  </Label>
-                  <Input
-                    id="add-phone"
-                    {...addForm.register("phone")}
-                    className="col-span-3"
-                  />
-                  {addForm.formState.errors.phone && (
-                    <p className="col-span-4 text-sm text-red-500 text-right">
-                      {addForm.formState.errors.phone.message}
-                    </p>
-                  )}
-                </div>
+            <form onSubmit={addForm.handleSubmit(handleAddSubmit)} className="space-y-4">
+              <div>
+                <Label>الاسم</Label>
+                <Input {...addForm.register("name")} placeholder="اسم المستخدم" />
+                {addForm.formState.errors.name && (
+                  <p className="text-red-500 text-xs mt-1">{addForm.formState.errors.name.message}</p>
+                )}
+              </div>
+              <div>
+                <Label>الإيميل</Label>
+                <Input {...addForm.register("email")} type="email" placeholder="example@email.com" />
+                {addForm.formState.errors.email && (
+                  <p className="text-red-500 text-xs mt-1">{addForm.formState.errors.email.message}</p>
+                )}
+              </div>
+              <div>
+                <Label>الباسورد</Label>
+                <Input {...addForm.register("password")} type="password" placeholder="6 أحرف على الأقل" />
+                {addForm.formState.errors.password && (
+                  <p className="text-red-500 text-xs mt-1">{addForm.formState.errors.password.message}</p>
+                )}
+              </div>
+              <div>
+                <Label>الصلاحية (Role)</Label>
+                <select
+                  {...addForm.register("role")}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="patient">مريض (Patient)</option>
+                  <option value="doctor">طبيب (Doctor)</option>
+                  <option value="admin">مدير (Admin)</option>
+                </select>
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setAddModalOpen(false)}>
-                  Cancel
+                  إلغاء
                 </Button>
-                <Button type="submit">Add Patient</Button>
+                <Button type="submit" disabled={addLoading} className="bg-[#185ba5] hover:bg-[#134885]">
+                  {addLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
+                  {addLoading ? "جاري الإضافة..." : "إضافة المستخدم"}
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
-      </div>
 
-      {/* Pagination and Rows Per Page */}
-      <div className="bg-white rounded-2xl shadow-lg p-6 mt-8">
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Rows per page:</span>
-            <Select value={rowsPerPage.toString()} onValueChange={handleRowsPerPageChange}>
-              <SelectTrigger className="w-20">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="5">5</SelectItem>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="20">20</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        {/* Update Modal */}
+        <Dialog open={updateModalOpen} onOpenChange={setUpdateModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>تعديل بيانات المستخدم</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={updateForm.handleSubmit(handleUpdateSubmit)} className="space-y-4">
+              <div>
+                <Label>الاسم</Label>
+                <Input {...updateForm.register("name")} />
+                {updateForm.formState.errors.name && (
+                  <p className="text-red-500 text-xs mt-1">{updateForm.formState.errors.name.message}</p>
+                )}
+              </div>
+              <div>
+                <Label>الإيميل</Label>
+                <Input {...updateForm.register("email")} />
+                {updateForm.formState.errors.email && (
+                  <p className="text-red-500 text-xs mt-1">{updateForm.formState.errors.email.message}</p>
+                )}
+              </div>
+              <div>
+                <Label>الصلاحية (Role)</Label>
+                <select
+                  {...updateForm.register("role")}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="patient">مريض (Patient)</option>
+                  <option value="doctor">طبيب (Doctor)</option>
+                  <option value="admin">مدير (Admin)</option>
+                </select>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setUpdateModalOpen(false)}>إلغاء</Button>
+                <Button type="submit">حفظ التغييرات</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
-          <div className="text-sm text-gray-600">
-            Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, filteredPatients.length)} of {filteredPatients.length} patients
-          </div>
-
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  size="sm"
-                  onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
-                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                />
-              </PaginationItem>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <PaginationItem key={page}>
-                  <PaginationLink
-                    size="sm"
-                    onClick={() => handlePageChange(page)}
-                    isActive={currentPage === page}
-                    className="cursor-pointer"
-                  >
-                    {page}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-
-              <PaginationItem>
-                <PaginationNext
-                  size="sm"
-                  onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
-                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
+        {/* Delete Modal */}
+        <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>هل أنت متأكد من الحذف؟</DialogTitle>
+              <DialogDescription>
+                سيتم مسح بيانات <strong>{selectedPatient?.name}</strong> من قاعدة البيانات نهائياً.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteModalOpen(false)}>إلغاء</Button>
+              <Button variant="destructive" onClick={handleDeleteConfirm}>تأكيد الحذف</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

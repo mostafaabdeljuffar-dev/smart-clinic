@@ -5,10 +5,11 @@ import * as z from "zod";
 import { User, Lock, EyeOff, Eye, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
-import useAuth from "@/auth/useAuth";
+import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification } from "firebase/auth";
+import { auth, db } from "@/firebase";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import logo from "@assets/logo.png";
 
-// Schema
 const registerSchema = z.object({
   role: z.enum(['user', 'doctor']),
   username: z.string().optional(),
@@ -55,45 +56,75 @@ export default function Register() {
   const [role, setRole] = useState<'user' | 'doctor'>('user');
 
   const navigate = useNavigate();
-  const { signUp, user } = useAuth();
 
   const registerForm = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: {
-      role: 'user',
-    },
+    defaultValues: { role: 'user' },
   });
 
   useEffect(() => {
-    registerForm.reset({
-      role,
-    });
+    registerForm.reset({ role });
   }, [role, registerForm]);
 
   const onSubmit = async (values: RegisterFormValues) => {
     setIsLoading(true);
     try {
-      const signUpData = {
-        userName: values.role === 'user' ? values.username : values.name,
+      // 1. إنشاء الحساب في Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        values.email,
+        values.password
+      );
+      const user = userCredential.user;
+
+      const finalName = values.role === 'user' ? values.username : values.name;
+
+      // 2. تحديث الـ Display Name
+      await updateProfile(user, { displayName: finalName });
+
+      // 3. إضافة في collection users
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        name: finalName,
         email: values.email,
-        password: values.password,
-        role: values.role,
-        ...(values.role === 'doctor' && {
+        role: values.role === 'doctor' ? "pending" : "patient",
+        status: "active",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      // 4. لو Doctor نضيفه في doctors و doctorRequests
+      if (values.role === 'doctor') {
+        // collection doctors
+        await setDoc(doc(db, "doctors", user.uid), {
+          uid: user.uid,
+          name: values.name,
+          email: values.email,
           specialization: values.specialization,
-        }),
-      };
-      const result = await signUp(signUpData as any);
-      if (result.status === 'success') {
-        // Navigate based on authority
-        if (user?.authority?.includes('doctor')) {
-          navigate('/doctor-dashboard');
-        } else {
-          navigate('/');
-        }
-      } else {
-        alert(result.message);
+          status: "pending",
+          createdAt: serverTimestamp(),
+        });
+
+        // collection doctorRequests
+        await setDoc(doc(db, "doctorRequests", user.uid), {
+          userId: user.uid,
+          name: values.name,
+          email: values.email,
+          specialization: values.specialization,
+          status: "pending",
+          createdAt: serverTimestamp(),
+        });
       }
+
+      // 5. إرسال إيميل التفعيل
+      await sendEmailVerification(user);
+      await auth.signOut();
+
+      alert("تم إنشاء الحساب ✅\nلازم تأكد الإيميل الأول قبل تسجيل الدخول 📧");
+      navigate("/login");
+
     } catch (error: any) {
+      console.error("Firebase Error:", error.code);
       alert(error.message);
     } finally {
       setIsLoading(false);
@@ -112,14 +143,14 @@ export default function Register() {
             <button
               type="button"
               onClick={() => setRole('user')}
-              className={`px-4 py-2 rounded-full font-semibold ${role === 'user' ? 'bg-[#185ba5] text-white' : 'bg-gray-200 text-gray-600'}`}
+              className={`px-4 py-2 rounded-full font-semibold cursor-pointer transition-all ${role === 'user' ? 'bg-[#185ba5] text-white' : 'bg-gray-200 text-gray-600'}`}
             >
               User
             </button>
             <button
               type="button"
               onClick={() => setRole('doctor')}
-              className={`px-4 py-2 rounded-full font-semibold ${role === 'doctor' ? 'bg-[#185ba5] text-white' : 'bg-gray-200 text-gray-600'}`}
+              className={`px-4 py-2 rounded-full font-semibold cursor-pointer transition-all ${role === 'doctor' ? 'bg-[#185ba5] text-white' : 'bg-gray-200 text-gray-600'}`}
             >
               Doctor
             </button>
@@ -127,6 +158,7 @@ export default function Register() {
         </div>
 
         <form className="space-y-5" onSubmit={registerForm.handleSubmit(onSubmit)}>
+
           {/* Name/Username */}
           <div className="w-full">
             <div className="relative flex items-center gap-3 bg-[#f0f4f8] rounded-xl border border-blue-100 overflow-hidden focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-400 transition-all">
@@ -134,7 +166,9 @@ export default function Register() {
                 <User size={20} className="text-gray-600" />
               </div>
               <div className="flex-1 py-2">
-                <label className="text-xs text-gray-500 font-medium block">{role === 'user' ? 'Username' : 'Name'}</label>
+                <label className="text-xs text-gray-500 font-medium block">
+                  {role === 'user' ? 'Username' : 'Name'}
+                </label>
                 <input
                   type="text"
                   {...registerForm.register(role === 'user' ? "username" : "name")}
@@ -142,7 +176,11 @@ export default function Register() {
                 />
               </div>
             </div>
-            {registerForm.formState.errors[role === 'user' ? 'username' : 'name'] && <p className="text-red-500 text-xs mt-1">{(registerForm.formState.errors[role === 'user' ? 'username' : 'name'] as any)?.message}</p>}
+            {registerForm.formState.errors[role === 'user' ? 'username' : 'name'] && (
+              <p className="text-red-500 text-xs mt-1">
+                {(registerForm.formState.errors[role === 'user' ? 'username' : 'name'] as any)?.message}
+              </p>
+            )}
           </div>
 
           {/* Email */}
@@ -160,10 +198,14 @@ export default function Register() {
                 />
               </div>
             </div>
-            {registerForm.formState.errors.email && <p className="text-red-500 text-xs mt-1">{(registerForm.formState.errors.email as any).message}</p>}
+            {registerForm.formState.errors.email && (
+              <p className="text-red-500 text-xs mt-1">
+                {(registerForm.formState.errors.email as any).message}
+              </p>
+            )}
           </div>
 
-          {/* Specialization for Doctor */}
+          {/* Specialization - Doctor Only */}
           {role === 'doctor' && (
             <div className="w-full">
               <div className="relative flex items-center gap-3 bg-[#f0f4f8] rounded-xl border border-blue-100 overflow-hidden focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-400 transition-all">
@@ -179,7 +221,11 @@ export default function Register() {
                   />
                 </div>
               </div>
-              {registerForm.formState.errors.specialization && <p className="text-red-500 text-xs mt-1">{(registerForm.formState.errors.specialization as any).message}</p>}
+              {registerForm.formState.errors.specialization && (
+                <p className="text-red-500 text-xs mt-1">
+                  {(registerForm.formState.errors.specialization as any).message}
+                </p>
+              )}
             </div>
           )}
 
@@ -205,7 +251,11 @@ export default function Register() {
                 {showPassword ? <Eye size={20} /> : <EyeOff size={20} />}
               </button>
             </div>
-            {registerForm.formState.errors.password && <p className="text-red-500 text-xs mt-1">{(registerForm.formState.errors.password as any).message}</p>}
+            {registerForm.formState.errors.password && (
+              <p className="text-red-500 text-xs mt-1">
+                {(registerForm.formState.errors.password as any).message}
+              </p>
+            )}
           </div>
 
           {/* Confirm Password */}
@@ -230,7 +280,11 @@ export default function Register() {
                 {showConfirmPassword ? <Eye size={20} /> : <EyeOff size={20} />}
               </button>
             </div>
-            {registerForm.formState.errors.confirmPassword && <p className="text-red-500 text-xs mt-1">{(registerForm.formState.errors.confirmPassword as any).message}</p>}
+            {registerForm.formState.errors.confirmPassword && (
+              <p className="text-red-500 text-xs mt-1">
+                {(registerForm.formState.errors.confirmPassword as any).message}
+              </p>
+            )}
           </div>
 
           <Button
@@ -250,6 +304,7 @@ export default function Register() {
               Log In
             </Link>
           </div>
+
         </form>
       </div>
     </div>
