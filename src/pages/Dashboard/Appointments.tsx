@@ -13,10 +13,22 @@ export default function Appointments() {
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
 
   const departments = [
-    { id: 1, name: "جراحة عامة", nameEn: "General Surgery" },
-    { id: 2, name: "جلدية", nameEn: "Dermatology" },
-    { id: 3, name: "عظام", nameEn: "Orthopedics" },
-    { id: 4, name: "أطفال", nameEn: "Pediatrics" }
+    { id: 1, name: "عيادة القلب", nameEn: "Cardiology Clinic" },
+    { id: 2, name: "عيادة الصدر", nameEn: "Chest Clinic" },
+    { id: 3, name: "عيادة الأسنان", nameEn: "Dental Clinic" },
+    { id: 4, name: "عيادة الجلدية", nameEn: "Dermatology Clinic" },
+    { id: 5, name: "عيادة الأنف والأذن", nameEn: "ENT Clinic" },
+    { id: 6, name: "عيادة العيون", nameEn: "Eye Clinic" },
+    { id: 7, name: "عيادة النساء والتوليد", nameEn: "Gynecology Clinic" },
+    { id: 8, name: "قسم الباطنة للنساء", nameEn: "Internal Medicine Female" },
+    { id: 9, name: "قسم الباطنة للرجال", nameEn: "Internal Medicine Male" },
+    { id: 10, name: "عيادة الأعصاب", nameEn: "Neurology Clinic" },
+    { id: 11, name: "عيادة جراحة الأعصاب", nameEn: "Neurosurgery Clinic" },
+    { id: 12, name: "عيادة التغذية", nameEn: "Nutrition Clinic" },
+    { id: 13, name: "عيادة العظام", nameEn: "Orthopedic Clinic" },
+    { id: 14, name: "عيادة العلاج الطبيعي", nameEn: "Physiotherapy Clinic" },
+    { id: 15, name: "عيادة الجراحة", nameEn: "Surgery Clinic" },
+    { id: 16, name: "عيادة المسالك البولية", nameEn: "Urology Clinic" }
   ];
 
   const timeSlots = [

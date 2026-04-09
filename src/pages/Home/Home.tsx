@@ -7,8 +7,6 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Department = {
   id: number;
@@ -101,39 +99,36 @@ export default function Home() {
   }
 
   const departments = [
-    {
-      id: 1,
-      name: "جراحة عامة",
-      nameEn: "General Surgery",
-      description: "General surgery department for surgical procedures",
-      icon: Stethoscope
-    },
-    {
-      id: 2,
-      name: "جلدية",
-      nameEn: "Dermatology",
-      description: "Skin care and dermatological treatments",
-      icon: Star
-    },
-    {
-      id: 3,
-      name: "عظام",
-      nameEn: "Orthopedics",
-      description: "Bone and joint care and treatments",
-      icon: MapPin
-    },
-    {
-      id: 4,
-      name: "أطفال",
-      nameEn: "Pediatrics",
-      description: "Children's health and medical care",
-      icon: MessageCircle
-    }
+    { id: 1, name: "عيادة القلب", nameEn: "Cardiology Clinic", description: "Heart and cardiovascular care", icon: Stethoscope },
+    { id: 2, name: "عيادة الصدر", nameEn: "Chest Clinic", description: "Respiratory and lung care", icon: Stethoscope },
+    { id: 3, name: "عيادة الأسنان", nameEn: "Dental Clinic", description: "Dental care and treatments", icon: Stethoscope },
+    { id: 4, name: "عيادة الجلدية", nameEn: "Dermatology Clinic", description: "Skin care and treatments", icon: Star },
+    { id: 5, name: "عيادة الأنف والأذن", nameEn: "ENT Clinic", description: "Ear, nose and throat care", icon: Stethoscope },
+    { id: 6, name: "عيادة العيون", nameEn: "Eye Clinic", description: "Vision and eye care", icon: Star },
+    { id: 7, name: "عيادة النساء والتوليد", nameEn: "Gynecology Clinic", description: "Women's health and obstetrics", icon: Stethoscope },
+    { id: 8, name: "قسم الباطنة للنساء", nameEn: "Internal Medicine Female", description: "Internal medicine for women", icon: Stethoscope },
+    { id: 9, name: "قسم الباطنة للرجال", nameEn: "Internal Medicine Male", description: "Internal medicine for men", icon: Stethoscope },
+    { id: 10, name: "عيادة الأعصاب", nameEn: "Neurology Clinic", description: "Nervous system care", icon: MapPin },
+    { id: 11, name: "عيادة جراحة الأعصاب", nameEn: "Neurosurgery Clinic", description: "Neurosurgical procedures", icon: MapPin },
+    { id: 12, name: "عيادة التغذية", nameEn: "Nutrition Clinic", description: "Dietary and nutritional counseling", icon: Star },
+    { id: 13, name: "عيادة العظام", nameEn: "Orthopedic Clinic", description: "Bone and joint care", icon: MapPin },
+    { id: 14, name: "عيادة العلاج الطبيعي", nameEn: "Physiotherapy Clinic", description: "Physical rehabilitation therapy", icon: Stethoscope },
+    { id: 15, name: "عيادة الجراحة", nameEn: "Surgery Clinic", description: "General surgical procedures", icon: Stethoscope },
+    { id: 16, name: "عيادة المسالك البولية", nameEn: "Urology Clinic", description: "Urinary system care", icon: MapPin }
   ];
 
-  const timeSlots = [
-    "9:00 AM", "10:00 AM", "11:00 AM", "2:00 PM", "3:00 PM", "4:00 PM"
-  ];
+  const getNext7Days = () => {
+    const days = [];
+    const today = new Date();
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() + i);
+      days.push(date);
+    }
+    return days;
+  };
+
+  const timeSlots = ["9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", "1:00 PM"];
 
   const handleBook = (department: Department) => {
     setSelectedDepartment(department);
@@ -283,51 +278,68 @@ export default function Home() {
                 </h3>
                 <p className="text-gray-600">Select your preferred date and time</p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+              <div className="space-y-6 max-w-4xl mx-auto">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-4">
                     Select Date
                   </label>
-                  <CalendarComponent
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={setSelectedDate}
-                    disabled={(date) => date < new Date() || date < new Date("1900-01-01")}
-                    className="w-full rounded-md border bg-white"
-                  />
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {getNext7Days().map((date) => (
+                      <label key={date.toDateString()} className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-blue-50 transition-colors" style={{
+                        backgroundColor: selectedDate?.toDateString() === date.toDateString() ? '#e0f2fe' : 'transparent',
+                        borderColor: selectedDate?.toDateString() === date.toDateString() ? '#0284c7' : '#e5e7eb'
+                      }}>
+                        <input
+                          type="radio"
+                          name="date"
+                          value={date.toDateString()}
+                          checked={selectedDate?.toDateString() === date.toDateString()}
+                          onChange={() => setSelectedDate(date)}
+                          className="w-4 h-4 text-[#185ba5]"
+                        />
+                        <span className="ml-2 text-sm font-medium text-gray-700">{date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-4">
                     Select Time
                   </label>
-                  <Select value={selectedTime} onValueChange={setSelectedTime}>
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder="Choose a time slot" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {timeSlots.map((slot) => (
-                        <SelectItem key={slot} value={slot}>
-                          {slot}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="mt-6 flex gap-3">
-                    <Button
-                      variant="outline"
-                      onClick={() => setSelectedDepartment(null)}
-                      className="flex-1"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleConfirmBooking}
-                      disabled={!selectedDate || !selectedTime}
-                      className="flex-1"
-                    >
-                      Book Now
-                    </Button>
+                  <div className="grid grid-cols-3 md:grid-cols-7 gap-2">
+                    {timeSlots.map((slot) => (
+                      <label key={slot} className="flex items-center p-2 border rounded-lg cursor-pointer hover:bg-blue-50 transition-colors" style={{
+                        backgroundColor: selectedTime === slot ? '#e0f2fe' : 'transparent',
+                        borderColor: selectedTime === slot ? '#0284c7' : '#e5e7eb'
+                      }}>
+                        <input
+                          type="radio"
+                          name="time"
+                          value={slot}
+                          checked={selectedTime === slot}
+                          onChange={(e) => setSelectedTime(e.target.value)}
+                          className="w-4 h-4 text-[#185ba5]"
+                        />
+                        <span className="ml-2 text-sm font-medium text-gray-700">{slot}</span>
+                      </label>
+                    ))}
                   </div>
+                </div>
+                <div className="flex gap-3 mt-6">
+                  <Button
+                    variant="outline"
+                    onClick={() => setSelectedDepartment(null)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleConfirmBooking}
+                    disabled={!selectedDate || !selectedTime}
+                    className="flex-1"
+                  >
+                    Book Now
+                  </Button>
                 </div>
               </div>
             </div>

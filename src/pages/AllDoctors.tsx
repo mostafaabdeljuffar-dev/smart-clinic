@@ -2,8 +2,6 @@ import { useState } from "react";
 import { Star, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Doctor = {
   id: number;
@@ -73,9 +71,18 @@ export default function AllDoctors() {
     }
   ];
 
-  const timeSlots = [
-    "9:00 AM", "10:00 AM", "11:00 AM", "2:00 PM", "3:00 PM", "4:00 PM"
-  ];
+  const getNext7Days = () => {
+    const days = [];
+    const today = new Date();
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() + i);
+      days.push(date);
+    }
+    return days;
+  };
+
+  const timeSlots = ["9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", "1:00 PM"];
 
   const handleBook = (doctor: Doctor) => {
     setSelectedDoctor(doctor);
@@ -162,33 +169,50 @@ export default function AllDoctors() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
                 Select Date
               </label>
-              <CalendarComponent
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                disabled={(date) => date < new Date() || date < new Date("1900-01-01")}
-                className="w-full rounded-md border"
-              />
+              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                {getNext7Days().map((date) => (
+                  <label key={date.toDateString()} className="flex items-center p-2 border rounded-lg cursor-pointer hover:bg-blue-50 transition-colors" style={{
+                    backgroundColor: selectedDate?.toDateString() === date.toDateString() ? '#e0f2fe' : 'transparent',
+                    borderColor: selectedDate?.toDateString() === date.toDateString() ? '#0284c7' : '#e5e7eb'
+                  }}>
+                    <input
+                      type="radio"
+                      name="doctor-date"
+                      value={date.toDateString()}
+                      checked={selectedDate?.toDateString() === date.toDateString()}
+                      onChange={() => setSelectedDate(date)}
+                      className="w-3 h-3 text-[#185ba5]"
+                    />
+                    <span className="ml-2 text-xs font-medium text-gray-700">{date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                  </label>
+                ))}
+              </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
                 Select Time
               </label>
-              <Select value={selectedTime} onValueChange={setSelectedTime}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a time slot" />
-                </SelectTrigger>
-                <SelectContent>
-                  {timeSlots.map((slot) => (
-                    <SelectItem key={slot} value={slot}>
-                      {slot}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-4 gap-2">
+                {timeSlots.map((slot) => (
+                  <label key={slot} className="flex items-center p-2 border rounded-lg cursor-pointer hover:bg-blue-50 transition-colors" style={{
+                    backgroundColor: selectedTime === slot ? '#e0f2fe' : 'transparent',
+                    borderColor: selectedTime === slot ? '#0284c7' : '#e5e7eb'
+                  }}>
+                    <input
+                      type="radio"
+                      name="doctor-time"
+                      value={slot}
+                      checked={selectedTime === slot}
+                      onChange={(e) => setSelectedTime(e.target.value)}
+                      className="w-3 h-3 text-[#185ba5]"
+                    />
+                    <span className="ml-1 text-xs font-medium text-gray-700">{slot}</span>
+                  </label>
+                ))}
+              </div>
             </div>
             <div className="flex gap-3 pt-4">
               <Button variant="outline" onClick={() => setShowBooking(false)} className="flex-1">
