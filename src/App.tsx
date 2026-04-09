@@ -14,6 +14,8 @@ import DoctorDashboard from "./pages/Doctor/DoctorDashboard"
 
 const NotFound = lazy(() => import("./pages/not-found"))
 const Unauthorized = lazy(() => import("./pages/unauthorized"))
+const UserAppointments = lazy(() => import("./pages/UserAppointments"))
+const AllDoctors = lazy(() => import("./pages/AllDoctors"))
 
 const Patients = lazy(() => import("./pages/Dashboard/Patients").catch(() => ({ default: () => <div className="p-10"><h1 className="text-2xl font-bold">Patients Management</h1><p className="text-gray-500">Coming soon...</p></div> })))
 const Doctors = lazy(() => import("./pages/Dashboard/Doctors").catch(() => ({ default: () => <div className="p-10"><h1 className="text-2xl font-bold">Doctors Management</h1><p className="text-gray-500">Coming soon...</p></div> })))
@@ -50,6 +52,8 @@ function Router() {
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>
                 <Route path="/" element={<Home />} />
+                <Route path="/appointments" element={<UserAppointments />} />
+                <Route path="/doctors" element={<AllDoctors />} />
               </Route>
             </Route>
 

@@ -1,129 +1,171 @@
 import DashboardLayout from "@/components/layouts/DashboardLayout";
-import { Calendar, Clock, User, CheckCircle, AlertCircle } from "lucide-react";
+import { Clock, User, CheckCircle, AlertCircle, XCircle, Eye } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+
+type Department = {
+  id: number;
+  name: string;
+  nameEn: string;
+};
 
 export default function Appointments() {
-  // Sample appointments data
-  const appointments = [
-    {
-      id: 1,
-      patientName: "Ahmed Hassan",
-      date: "2026-03-08",
-      time: "10:00 AM",
-      type: "Consultation",
-      status: "Confirmed",
-      notes: "Follow-up visit"
-    },
-    {
-      id: 2,
-      patientName: "Fatima Ali",
-      date: "2026-03-08",
-      time: "11:30 AM",
-      type: "Check-up",
-      status: "Confirmed",
-      notes: "Regular check-up"
-    },
-    {
-      id: 3,
-      patientName: "Mohammed Karim",
-      date: "2026-03-08",
-      time: "02:00 PM",
-      type: "Lab Test",
-      status: "Pending",
-      notes: "Blood test required"
-    }
+  const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
+
+  const departments = [
+    { id: 1, name: "جراحة عامة", nameEn: "General Surgery" },
+    { id: 2, name: "جلدية", nameEn: "Dermatology" },
+    { id: 3, name: "عظام", nameEn: "Orthopedics" },
+    { id: 4, name: "أطفال", nameEn: "Pediatrics" }
   ];
+
+  const timeSlots = [
+    { date: "2026-04-10", time: "9:00 AM" },
+    { date: "2026-04-10", time: "10:00 AM" },
+    { date: "2026-04-10", time: "11:00 AM" },
+    { date: "2026-04-11", time: "2:00 PM" },
+    { date: "2026-04-11", time: "3:00 PM" },
+    { date: "2026-04-11", time: "4:00 PM" }
+  ];
+
+  // Mock bookings data
+  const bookings = [
+    { id: 1, departmentId: 1, date: "2026-04-10", timeSlot: "9:00 AM", patientName: "Ahmed Hassan", status: "pending" },
+    { id: 2, departmentId: 1, date: "2026-04-10", timeSlot: "10:00 AM", patientName: "Fatima Ali", status: "accepted" },
+    { id: 3, departmentId: 2, date: "2026-04-10", timeSlot: "11:00 AM", patientName: "Mohammed Karim", status: "pending" },
+    { id: 4, departmentId: 3, date: "2026-04-11", timeSlot: "2:00 PM", patientName: "Sara Ahmed", status: "rejected" },
+    { id: 5, departmentId: 4, date: "2026-04-11", timeSlot: "3:00 PM", patientName: "Omar Youssef", status: "accepted" },
+    { id: 6, departmentId: 1, date: "2026-04-10", timeSlot: "9:00 AM", patientName: "Laila Mahmoud", status: "pending" }
+  ];
+
+  const getBookingsForDepartment = (deptId: number) => bookings.filter(b => b.departmentId === deptId);
+
+  const getBookingCount = (deptId: number, slot: { date: string; time: string }) =>
+    bookings.filter(b => b.departmentId === deptId && b.date === slot.date && b.timeSlot === slot.time).length;
+
+  const handleAccept = (bookingId: number) => {
+    // In real app, update database
+    console.log("Accept booking", bookingId);
+  };
+
+  const handleReject = (bookingId: number) => {
+    // In real app, update database
+    console.log("Reject booking", bookingId);
+  };
 
   return (
     <DashboardLayout>
       <div>
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-[#1a3a60] mb-2">Appointments Management</h1>
-          <p className="text-gray-600">View and manage your appointments</p>
+          <p className="text-gray-600">Manage bookings across all departments</p>
         </div>
 
-        {/* Appointments Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm font-medium">Today's Appointments</p>
-                <h3 className="text-3xl font-bold text-[#1a3a60] mt-2">5</h3>
-              </div>
-              <Calendar className="text-[#185ba5] bg-blue-100 p-3 rounded-lg" size={40} />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm font-medium">Confirmed</p>
-                <h3 className="text-3xl font-bold text-green-600 mt-2">4</h3>
-              </div>
-              <CheckCircle className="text-green-600 bg-green-100 p-3 rounded-lg" size={40} />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm font-medium">Pending</p>
-                <h3 className="text-3xl font-bold text-orange-600 mt-2">1</h3>
-              </div>
-              <AlertCircle className="text-orange-600 bg-orange-100 p-3 rounded-lg" size={40} />
-            </div>
-          </div>
-        </div>
-
-        {/* Appointments List */}
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-lg font-bold text-[#1a3a60]">Upcoming Appointments</h3>
-          </div>
-          <div className="divide-y divide-gray-200">
-            {appointments.map((appointment) => (
-              <div key={appointment.id} className="p-6 hover:bg-gray-50 transition-colors">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <User size={20} className="text-[#185ba5]" />
+        {!selectedDepartment ? (
+          <>
+            {/* Departments Overview */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              {departments.map((dept) => (
+                <div
+                  key={dept.id}
+                  className="bg-white rounded-2xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-shadow"
+                  onClick={() => setSelectedDepartment(dept)}
+                >
+                  <h3 className="text-lg font-bold text-[#1a3a60] mb-2">{dept.name}</h3>
+                  <p className="text-sm text-gray-600 mb-4">{dept.nameEn}</p>
+                  <div className="space-y-2">
+                    {timeSlots.map((slot) => (
+                      <div key={`${slot.date}-${slot.time}`} className="flex justify-between items-center text-sm">
+                        <span className="flex items-center gap-2">
+                          <Clock size={14} className="text-gray-400" />
+                          <span>{slot.date}</span>
+                          <span className="text-gray-500">•</span>
+                          <span>{slot.time}</span>
+                        </span>
+                        <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs">
+                          {getBookingCount(dept.id, slot)} bookings
+                        </span>
                       </div>
-                      <div>
-                        <p className="font-semibold text-gray-900">{appointment.patientName}</p>
-                        <p className="text-sm text-gray-500">{appointment.type}</p>
+                    ))}
+                  </div>
+                  <div className="mt-4 text-center">
+                    <Button variant="outline" size="sm">
+                      <Eye size={14} className="mr-2" />
+                      View Details
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Department Details */}
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-[#1a3a60]">{selectedDepartment.name}</h2>
+                  <p className="text-gray-600">{selectedDepartment.nameEn}</p>
+                </div>
+                <Button variant="outline" onClick={() => setSelectedDepartment(null)}>
+                  Back to Overview
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                {getBookingsForDepartment(selectedDepartment.id).map((booking) => (
+                  <div key={booking.id} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                          <User size={20} className="text-[#185ba5]" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-900">{booking.patientName}</p>
+                          <p className="text-sm text-gray-500 flex items-center gap-2">
+                            <Clock size={14} />
+                            {booking.date} • {booking.timeSlot}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          booking.status === "accepted"
+                            ? "bg-green-100 text-green-700"
+                            : booking.status === "rejected"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-orange-100 text-orange-700"
+                        }`}>
+                          {booking.status === "accepted" && <CheckCircle size={12} className="inline mr-1" />}
+                          {booking.status === "rejected" && <XCircle size={12} className="inline mr-1" />}
+                          {booking.status === "pending" && <AlertCircle size={12} className="inline mr-1" />}
+                          {booking.status}
+                        </span>
+                        {booking.status === "pending" && (
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => handleAccept(booking.id)}>
+                              <CheckCircle size={14} className="mr-1" />
+                              Accept
+                            </Button>
+                            <Button size="sm" variant="destructive" onClick={() => handleReject(booking.id)}>
+                              <XCircle size={14} className="mr-1" />
+                              Reject
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <Calendar size={16} className="text-gray-400" />
-                    <span className="text-sm">{appointment.date}</span>
+                ))}
+                {getBookingsForDepartment(selectedDepartment.id).length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    No bookings for this department yet.
                   </div>
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <Clock size={16} className="text-gray-400" />
-                    <span className="text-sm">{appointment.time}</span>
-                  </div>
-                  <div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      appointment.status === "Confirmed"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-orange-100 text-orange-700"
-                    }`}>
-                      {appointment.status}
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button className="text-[#185ba5] hover:text-[#134885] font-medium text-sm">
-                      Edit
-                    </button>
-                    <button className="text-red-500 hover:text-red-700 font-medium text-sm">
-                      Cancel
-                    </button>
-                  </div>
-                </div>
+                )}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+          </>
+        )}
       </div>
     </DashboardLayout>
   );

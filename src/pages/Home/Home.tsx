@@ -5,11 +5,29 @@ import { auth, db } from "@/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+type Department = {
+  id: number;
+  name: string;
+  nameEn: string;
+  description: string;
+  icon: React.ComponentType<any>;
+};
 
 export default function Home() {
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedTime, setSelectedTime] = useState<string>("");
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [bookingNumber, setBookingNumber] = useState<number | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -82,52 +100,65 @@ export default function Home() {
     );
   }
 
-  const doctors = [
+  const departments = [
     {
       id: 1,
-      name: "Dr. Mohamed Ashour",
-      specialty: "جراحة عامة",
-      department: "Surgery Department",
-      price: 1000,
-      rating: 4.8,
-      reviews: 124,
-      image: "https://scontent.fcai19-3.fna.fbcdn.net/v/t39.30808-6/527338358_2319736091814886_438638377195686443_n.jpg?_nc_cat=106&ccb=1-7&_nc_sid=1d70fc&_nc_eui2=AeG8P-jiktpvbQJu4Q76fsiXp1rNu4Zn7RmnWs27hmftGWNGdnC2NKllouKDpoPtt-diKA3aqyIRibK9Gw_XJncl&_nc_ohc=vOpuKDMJnDsQ7kNvwFjy_r0&_nc_oc=Adkkf3y5FZMr1vHv4Te-d5F05V0DIsTDA1Lx90jmYigF_HcLw1_Mtv8CJqROh4wCrNE&_nc_zt=23&_nc_ht=scontent.fcai19-3.fna&_nc_gid=ZqYF_DWW3waFPFNutb0qMA&_nc_ss=8&oh=00_Afz7Qq_frXdudd9R6Ii55zIKk33XGeaJXen27N4umPFzTw&oe=69B1BE8A",
-      description: "Dr. Mohamed is a general surgeon. He helps patients who need surgery and takes good care of them before and after the operation."
+      name: "جراحة عامة",
+      nameEn: "General Surgery",
+      description: "General surgery department for surgical procedures",
+      icon: Stethoscope
     },
     {
       id: 2,
-      name: "Dr. Sarah Ahmed",
-      specialty: "جلدية",
-      department: "Skin Care",
-      price: 120,
-      rating: 4.9,
-      reviews: 89,
-      image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&h=400&fit=crop&crop=face",
-      description: "Dr. Sarah treats skin problems like acne, rashes, and allergies. She also helps patients take better care of their skin."
+      name: "جلدية",
+      nameEn: "Dermatology",
+      description: "Skin care and dermatological treatments",
+      icon: Star
     },
     {
       id: 3,
-      name: "Dr. Mohamed Ali",
-      specialty: "عظام",
-      department: "Bone & Joint",
-      price: 180,
-      rating: 4.7,
-      reviews: 156,
-      image: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&h=400&fit=crop&crop=face",
-      description: "Dr. Mohamed helps patients with bone and joint problems. He treats injuries, fractures, and pain in the body."
+      name: "عظام",
+      nameEn: "Orthopedics",
+      description: "Bone and joint care and treatments",
+      icon: MapPin
     },
     {
       id: 4,
-      name: "Dr. Mostafa Ashry",
-      specialty: "أطفال",
-      department: "Children's Health",
-      price: 100,
-      rating: 4.9,
-      reviews: 203,
-      image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=face",
-      description: "Dr. Mostafa is a children's doctor. He checks kids' health and helps them grow strong and healthy."
+      name: "أطفال",
+      nameEn: "Pediatrics",
+      description: "Children's health and medical care",
+      icon: MessageCircle
     }
   ];
+
+  const timeSlots = [
+    "9:00 AM", "10:00 AM", "11:00 AM", "2:00 PM", "3:00 PM", "4:00 PM"
+  ];
+
+  const handleBook = (department: Department) => {
+    setSelectedDepartment(department);
+  };
+
+  const handleConfirmBooking = () => {
+    if (!selectedDate || !selectedTime) return;
+    setShowConfirm(true);
+  };
+
+  const confirmBooking = () => {
+    // Generate a random booking number
+    const number = Math.floor(Math.random() * 1000) + 1;
+    setBookingNumber(number);
+    setShowConfirm(false);
+    setShowSuccess(true);
+    // Here you would typically save the booking to database
+  };
+
+  const closeSuccess = () => {
+    setShowSuccess(false);
+    setSelectedDepartment(null);
+    setSelectedDate(undefined);
+    setSelectedTime("");
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -206,51 +237,154 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Doctors Section */}
+      {/* Departments Section */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-[#1a3a60] mb-4">
-              Meet Our Expert Doctors
+              Our Medical Departments
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Choose a doctor and book your appointment easily.
+              Choose a department and book your appointment easily.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {doctors.map((doctor) => (
+            {departments.map((department) => (
               <div
-                key={doctor.id}
-                className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-shadow border border-gray-100 overflow-hidden"
+                key={department.id}
+                className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-shadow border border-gray-100 overflow-hidden cursor-pointer"
+                onClick={() => setSelectedDepartment(department)}
               >
                 <div className="p-6">
                   <div className="flex flex-col items-center text-center">
-                    <img
-                      src={doctor.image}
-                      alt={doctor.name}
-                      className="w-24 h-24 rounded-full object-cover mb-4 border-4 border-blue-50"
-                    />
-                    <h3 className="text-xl font-bold text-[#1a3a60] mb-1">{doctor.name}</h3>
-                    <p className="text-[#185ba5] font-semibold mb-2">{doctor.specialty}</p>
-                    <div className="flex items-center gap-1 mb-3">
-                      <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                      <span className="text-sm font-medium text-gray-700">{doctor.rating}</span>
-                      <span className="text-sm text-gray-500">({doctor.reviews} reviews)</span>
-                    </div>
-                    <p className="text-gray-600 text-sm mb-4 line-clamp-3">{doctor.description}</p>
-                    <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
-                      <MapPin className="w-4 h-4" />
-                      <span>{doctor.department}</span>
-                    </div>
-                    <button className="bg-[#185ba5] hover:bg-[#134885] text-white px-4 py-2 rounded-lg font-medium transition-colors">
-                      Book Now
-                    </button>
+                    <department.icon className="w-12 h-12 text-[#185ba5] mb-4" />
+                    <h3 className="text-xl font-bold text-[#1a3a60] mb-1">{department.name}</h3>
+                    <p className="text-[#185ba5] font-semibold mb-2">{department.nameEn}</p>
+                    <p className="text-gray-600 text-sm mb-4">{department.description}</p>
+                  <Button
+                    onClick={() => handleBook(department)}
+                    className="bg-[#185ba5] hover:bg-[#134885] text-white"
+                  >
+                    Book Appointment
+                  </Button>
                   </div>
                 </div>
               </div>
             ))}
           </div>
+
+          {/* Time Slots for Selected Department */}
+          {selectedDepartment && (
+            <div className="mt-12 bg-gray-50 rounded-2xl p-8">
+              <div className="text-center mb-8">
+                <h3 className="text-2xl font-bold text-[#1a3a60] mb-2">
+                  Book Appointment in {selectedDepartment.name}
+                </h3>
+                <p className="text-gray-600">Select your preferred date and time</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Date
+                  </label>
+                  <CalendarComponent
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
+                    disabled={(date) => date < new Date() || date < new Date("1900-01-01")}
+                    className="w-full rounded-md border bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Time
+                  </label>
+                  <Select value={selectedTime} onValueChange={setSelectedTime}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Choose a time slot" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {timeSlots.map((slot) => (
+                        <SelectItem key={slot} value={slot}>
+                          {slot}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="mt-6 flex gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => setSelectedDepartment(null)}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleConfirmBooking}
+                      disabled={!selectedDate || !selectedTime}
+                      className="flex-1"
+                    >
+                      Book Now
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Confirmation Dialog */}
+          <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Confirm Booking</DialogTitle>
+              </DialogHeader>
+              <div className="py-4">
+                <p className="text-center mb-4">
+                  Are you sure you want to book an appointment in {selectedDepartment?.name} on{" "}
+                  {selectedDate?.toLocaleDateString()} at {selectedTime}?
+                </p>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">Department:</span>
+                    <span>{selectedDepartment?.name}</span>
+                  </div>
+                  <div className="flex justify-between items-center mt-2">
+                    <span className="font-medium">Date:</span>
+                    <span>{selectedDate?.toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center mt-2">
+                    <span className="font-medium">Time:</span>
+                    <span>{selectedTime}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-4">
+                <Button variant="outline" onClick={() => setShowConfirm(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={confirmBooking}>
+                  Confirm Booking
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Success Dialog */}
+          <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Booking Confirmed!</DialogTitle>
+              </DialogHeader>
+              <div className="text-center py-4">
+                <p className="text-lg mb-4">Your booking has been confirmed.</p>
+                <p className="text-2xl font-bold text-[#185ba5]">Your number is: {bookingNumber}</p>
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={closeSuccess}>Close</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           <div className="text-center mt-12">
             <button
