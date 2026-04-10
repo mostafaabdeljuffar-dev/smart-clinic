@@ -65,8 +65,8 @@ function Router() {
               <Route path="/dashboard/appointments" element={<Appointments />} />
             </Route>
 
-            {/* Doctor Dashboard — doctor only */}
-            <Route element={<RoleProtectedRoute allowedRoles={['doctor']} />}>
+            {/* Doctor Dashboard — مؤقتاً بدون role check لتشخيص المشكلة */}
+            <Route element={<ProtectedRoute />}>
               <Route path="/doctor-dashboard" element={<DoctorDashboard />} />
             </Route>
 

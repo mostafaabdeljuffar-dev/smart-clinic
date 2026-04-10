@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { User, Lock, EyeOff, Eye, Mail } from "lucide-react";
+import { User, Lock, EyeOff, Eye, Mail, Stethoscope } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification } from "firebase/auth";
@@ -10,12 +10,31 @@ import { auth, db } from "@/firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import logo from "@assets/logo.png";
 
+const CLINICS = [
+  { label: "Cardiology",              clinicId: "cardio_clinic" },
+  { label: "Chest",                   clinicId: "chest_clinic" },
+  { label: "Dental",                  clinicId: "dental_clinic" },
+  { label: "Dermatology",             clinicId: "derma_clinic" },
+  { label: "ENT",                     clinicId: "ent_clinic" },
+  { label: "Eye",                     clinicId: "eye_clinic" },
+  { label: "Gynecology",              clinicId: "gynecology_clinic" },
+  { label: "Internal Medicine (Female)", clinicId: "internal_medicine_female" },
+  { label: "Internal Medicine (Male)",   clinicId: "internal_medicine_male" },
+  { label: "Neurology",               clinicId: "neurology_clinic" },
+  { label: "Neurosurgery",            clinicId: "neurosurgery_clinic" },
+  { label: "Nutrition",               clinicId: "nutrition_clinic" },
+  { label: "Orthopedic",              clinicId: "orthopedic_clinic" },
+  { label: "Physiotherapy",           clinicId: "physiotherapy_clinic" },
+  { label: "Surgery",                 clinicId: "surgery_clinic" },
+  { label: "Urology",                 clinicId: "urology_clinic" },
+];
+
 const registerSchema = z.object({
   role: z.enum(['user', 'doctor']),
   username: z.string().optional(),
   name: z.string().optional(),
   email: z.string().email("Enter a valid email"),
-  specialization: z.string().optional(),
+  clinicId: z.string().optional(),
   password: z.string().min(6, "Password must be at least 6 characters"),
   confirmPassword: z.string().min(6, "Confirm password is required"),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -39,12 +58,12 @@ const registerSchema = z.object({
   path: ["name"],
 }).refine((data) => {
   if (data.role === 'doctor') {
-    return data.specialization && data.specialization.length >= 2;
+    return data.clinicId && data.clinicId.length > 0;
   }
   return true;
 }, {
-  message: "Specialization is required",
-  path: ["specialization"],
+  message: "Please select a specialization",
+  path: ["clinicId"],
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -69,7 +88,7 @@ export default function Register() {
   const onSubmit = async (values: RegisterFormValues) => {
     setIsLoading(true);
     try {
-      // 1. إنشاء الحساب في Firebase Auth
+      // 1. Create account in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         values.email,
@@ -79,10 +98,10 @@ export default function Register() {
 
       const finalName = values.role === 'user' ? values.username : values.name;
 
-      // 2. تحديث الـ Display Name
+      // 2. Update Display Name
       await updateProfile(user, { displayName: finalName });
 
-      // 3. إضافة في collection users
+      // 3. Add to users collection
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         name: finalName,
@@ -93,30 +112,22 @@ export default function Register() {
         updatedAt: serverTimestamp(),
       });
 
-      // 4. لو Doctor نضيفه في doctors و doctorRequests
+      // 4. If Doctor, add to doctors collection with clinicId
       if (values.role === 'doctor') {
-        // collection doctors
+        const selectedClinic = CLINICS.find((c) => c.clinicId === values.clinicId);
+
         await setDoc(doc(db, "doctors", user.uid), {
           uid: user.uid,
           name: values.name,
           email: values.email,
-          specialization: values.specialization,
-          status: "pending",
-          createdAt: serverTimestamp(),
-        });
-
-        // collection doctorRequests
-        await setDoc(doc(db, "doctorRequests", user.uid), {
-          userId: user.uid,
-          name: values.name,
-          email: values.email,
-          specialization: values.specialization,
+          clinicId: values.clinicId,
+          specialization: selectedClinic?.label ?? "",
           status: "pending",
           createdAt: serverTimestamp(),
         });
       }
 
-      // 5. إرسال إيميل التفعيل
+      // 5. Send verification email
       await sendEmailVerification(user);
       await auth.signOut();
 
@@ -205,25 +216,34 @@ export default function Register() {
             )}
           </div>
 
-          {/* Specialization - Doctor Only */}
+          {/* Specialization (Clinic Selection) - Doctor Only */}
           {role === 'doctor' && (
             <div className="w-full">
               <div className="relative flex items-center gap-3 bg-[#f0f4f8] rounded-xl border border-blue-100 overflow-hidden focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-400 transition-all">
                 <div className="h-14.5 ps-4 pe-3 flex items-center justify-center text-gray-500 bg-[#E1EFF9]">
-                  <User size={20} className="text-gray-600" />
+                  <Stethoscope size={20} className="text-gray-600" />
                 </div>
-                <div className="flex-1 py-2">
+                <div className="flex-1 py-2 pr-3">
                   <label className="text-xs text-gray-500 font-medium block">Specialization</label>
-                  <input
-                    type="text"
-                    {...registerForm.register("specialization")}
-                    className="w-full bg-transparent border-none outline-none text-[#1a3a60] font-semibold text-sm focus:ring-0 p-0"
-                  />
+                  <select
+                    {...registerForm.register("clinicId")}
+                    className="w-full bg-transparent border-none outline-none text-[#1a3a60] font-semibold text-sm focus:ring-0 p-0 cursor-pointer appearance-none"
+                    defaultValue=""
+                  >
+                    <option value="" disabled className="text-gray-400">
+                      Select your specialization
+                    </option>
+                    {CLINICS.map((clinic) => (
+                      <option key={clinic.clinicId} value={clinic.clinicId} className="text-[#1a3a60]">
+                        {clinic.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
-              {registerForm.formState.errors.specialization && (
+              {registerForm.formState.errors.clinicId && (
                 <p className="text-red-500 text-xs mt-1">
-                  {(registerForm.formState.errors.specialization as any).message}
+                  {(registerForm.formState.errors.clinicId as any).message}
                 </p>
               )}
             </div>

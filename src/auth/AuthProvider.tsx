@@ -28,14 +28,11 @@ function AuthProvider({ children }: AuthProviderProps) {
     const signedIn = useSessionUser((state) => state.session.signedIn)
     const user = useSessionUser((state) => state.user)
     const setUser = useSessionUser((state) => state.setUser)
-    const setSessionSignedIn = useSessionUser(
-        (state) => state.setSessionSignedIn,
-    )
+    const setSessionSignedIn = useSessionUser((state) => state.setSessionSignedIn)
     const { token, setToken } = useToken()
     const [tokenState, setTokenState] = useState(token)
 
     const authenticated = Boolean(tokenState && signedIn)
-
     const navigatorRef = useRef<IsolatedNavigatorRef>(null)
 
     const redirect = () => {
@@ -51,9 +48,7 @@ function AuthProvider({ children }: AuthProviderProps) {
         setToken(tokens.accessToken)
         setTokenState(tokens.accessToken)
         setSessionSignedIn(true)
-        if (user) {
-            setUser(user)
-        }
+        if (user) setUser(user)
     }
 
     const handleSignOut = () => {
@@ -65,46 +60,64 @@ function AuthProvider({ children }: AuthProviderProps) {
     const signIn = async (values: SignInCredential): AuthResult => {
         try {
             const resp: any = await signInWithEmailAndPassword(auth, values.username, values.password)
-            if (resp) {
-                const firebaseUser = resp.user
+            if (!resp) return { status: 'failed', message: 'Unable to sign in' }
 
-                // ── Check email verified ──────────────────────────────────
-                if (!firebaseUser.emailVerified) {
-                    return {
-                        status: 'failed',
-                        message: 'email_not_verified',
-                    }
+            const firebaseUser = resp.user
+
+            // 1. تحقق من الإيميل
+            if (!firebaseUser.emailVerified) {
+                return { status: 'failed', message: 'email_not_verified' }
+            }
+
+            let role = 'patient'
+            let displayName = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User'
+
+            // 2. شوف في doctors الأول
+            const doctorDoc = await getDoc(doc(db, 'doctors', firebaseUser.uid))
+
+            if (doctorDoc.exists()) {
+                const data = doctorDoc.data()
+                displayName = data.name || displayName
+
+                if (data.role === 'doctor') {
+                    // ✅ أدمن وافق عليه
+                    role = 'doctor'
+                } else {
+                    // role == 'pending' → لسه تحت المراجعة
+                    return { status: 'failed', message: 'account_pending_approval' }
                 }
 
-                // ── Fetch role from Firestore users collection ────────────
-                let role = 'user'
-                try {
-                    const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
-                    if (userDoc.exists()) {
-                        role = userDoc.data().role ?? 'user'
-                    }
-                } catch {
-                    // keep default role = 'user'
-                }
+            } else {
+                // 3. مش في doctors → شوف في users
+                const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
 
-                const user: User = {
-                    userId: firebaseUser.uid,
-                    email: firebaseUser.email,
-                    userName: firebaseUser.email?.split('@')[0] || firebaseUser.displayName || 'User',
-                    avatar: firebaseUser.photoURL || null,
-                    authority: [role],
-                }
-
-                handleSignIn({ accessToken: firebaseUser.stsTokenManager.accessToken }, user)
-                return {
-                    status: 'success',
-                    message: '',
+                if (userDoc.exists()) {
+                    const data = userDoc.data()
+                    displayName = data.name || data.displayName || displayName
+                    role = data.role === 'admin' ? 'admin' : 'patient'
+                } else {
+                    return { status: 'failed', message: 'Unable to find account' }
                 }
             }
+
+            // 4. بناء الـ user object
+            const authedUser: User = {
+                userId: firebaseUser.uid,
+                email: firebaseUser.email,
+                userName: displayName,
+                avatar: firebaseUser.photoURL || null,
+                authority: [role],
+            }
+
+            handleSignIn({ accessToken: firebaseUser.stsTokenManager.accessToken }, authedUser)
+
+            // 5. رجّع الـ authority في الـ result عشان Login.tsx يعمل redirect صح
             return {
-                status: 'failed',
-                message: 'Unable to sign in',
-            }
+    status: 'success',
+    message: '',
+    ...(({ authority: [role] }) as any),
+} as any
+
         } catch (errors: any) {
             return {
                 status: 'failed',
@@ -119,15 +132,9 @@ function AuthProvider({ children }: AuthProviderProps) {
             if (resp) {
                 handleSignIn({ accessToken: resp.token }, resp.user)
                 redirect()
-                return {
-                    status: 'success',
-                    message: '',
-                }
+                return { status: 'success', message: '' }
             }
-            return {
-                status: 'failed',
-                message: 'Unable to sign up',
-            }
+            return { status: 'failed', message: 'Unable to sign up' }
         } catch (errors: any) {
             return {
                 status: 'failed',
@@ -145,26 +152,12 @@ function AuthProvider({ children }: AuthProviderProps) {
         }
     }
 
-    const oAuthSignIn = (
-        callback: (payload: OauthSignInCallbackPayload) => void,
-    ) => {
-        callback({
-            onSignIn: handleSignIn,
-            redirect,
-        })
+    const oAuthSignIn = (callback: (payload: OauthSignInCallbackPayload) => void) => {
+        callback({ onSignIn: handleSignIn, redirect })
     }
 
     return (
-        <AuthContext.Provider
-            value={{
-                authenticated,
-                user,
-                signIn,
-                signUp,
-                signOut,
-                oAuthSignIn,
-            }}
-        >
+        <AuthContext.Provider value={{ authenticated, user, signIn, signUp, signOut, oAuthSignIn }}>
             {children}
         </AuthContext.Provider>
     )

@@ -19,27 +19,21 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginFormValues>({
+  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
   });
 
   const navigate = useNavigate();
-  const { signIn, user } = useAuth(); // جبنا user من useAuth
+  const { signIn } = useAuth(); // ← مش محتاجين user هنا خالص
 
   const onSubmit = async (values: LoginFormValues) => {
-    const { username, password } = values;
     setIsLoading(true);
-
     try {
-      const result = await signIn({ username, password });
+      const result = await signIn({ username: values.username, password: values.password });
 
       if (result.status === 'success') {
-        // الـ user بييجي من useAuth مش من result
-        const authority = user?.authority ?? [];
+        // ✅ نقرأ من result مباشرة — مش من user state اللي بتتأخر
+        const authority: string[] = (result as any).authority ?? [];
 
         if (authority.includes('doctor')) {
           navigate('/doctor-dashboard');
@@ -48,11 +42,17 @@ export default function Login() {
         } else {
           navigate('/');
         }
+
       } else if (result.message === 'email_not_verified') {
-        alert("يا بطل، لازم تفعل حسابك من الإيميل الأول! 📧");
+        alert("لازم تفعل حسابك من الإيميل الأول! 📧");
+
+      } else if (result.message === 'account_pending_approval') {
+        alert("طلبك كدكتور لسه تحت المراجعة ⏳\nهيتم إشعارك لما يتم القبول.");
+
       } else {
-        alert(result.message);
+        alert(result.message || "حدث خطأ، حاول تاني.");
       }
+
     } catch (error: any) {
       alert(error.message);
     } finally {
@@ -63,7 +63,7 @@ export default function Login() {
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-background p-4 font-sans">
       <div className="w-full max-w-md bg-white rounded-4xl p-4 sm:p-8 md:p-10 shadow-xl shadow-blue-900/5">
-        
+
         <div className="flex flex-col items-center justify-center mb-8">
           <img src={logo} alt="Smart Clinic Logo" className="mb-2 object-contain" />
           <h2 className="text-2xl md:text-3xl font-bold text-[#1a3a60] mb-2 text-center">
