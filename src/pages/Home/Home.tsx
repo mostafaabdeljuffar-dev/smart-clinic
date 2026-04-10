@@ -2,544 +2,415 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "@/firebase";
 import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-  addDoc,
-  updateDoc,
-  doc,
-  getDocs,
-  getDoc,
-  runTransaction,
-  serverTimestamp,
+  collection, query, where, onSnapshot, updateDoc,
+  doc, getDocs, getDoc, runTransaction, serverTimestamp,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import {
-  Loader2,
-  ChevronLeft,
-  CalendarDays,
-  Clock,
-  CheckCircle2,
-  LayoutDashboard,
-  XCircle,
-  AlertCircle,
+  Loader2, ChevronLeft, CalendarDays, Clock, CheckCircle2,
+  LayoutDashboard, XCircle, AlertCircle, Sparkles, MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
+// ─── Clinic list ──────────────────────────────────────────────────────────────
 const CLINICS = [
-  { id: "cardio_clinic",            name: "Cardiology" },
-  { id: "chest_clinic",             name: "Chest" },
-  { id: "dental_clinic",            name: "Dental" },
-  { id: "derma_clinic",             name: "Dermatology" },
-  { id: "ent_clinic",               name: "ENT" },
-  { id: "eye_clinic",               name: "Eye" },
-  { id: "gynecology_clinic",        name: "Gynecology" },
-  { id: "internal_medicine_female", name: "Internal Medicine (Female)" },
-  { id: "internal_medicine_male",   name: "Internal Medicine (Male)" },
-  { id: "neurology_clinic",         name: "Neurology" },
-  { id: "neurosurgery_clinic",      name: "Neurosurgery" },
-  { id: "nutrition_clinic",         name: "Nutrition" },
-  { id: "orthopedic_clinic",        name: "Orthopedic" },
-  { id: "physiotherapy_clinic",     name: "Physiotherapy" },
-  { id: "surgery_clinic",           name: "Surgery" },
-  { id: "urology_clinic",           name: "Urology" },
+  { id: "cardio_clinic",            name: "Cardiology",        icon: "🫀", color: "from-rose-500 to-pink-600" },
+  { id: "chest_clinic",             name: "Chest",             icon: "🫁", color: "from-sky-500 to-blue-600" },
+  { id: "dental_clinic",            name: "Dental",            icon: "🦷", color: "from-teal-500 to-cyan-600" },
+  { id: "derma_clinic",             name: "Dermatology",       icon: "✨", color: "from-amber-500 to-orange-500" },
+  { id: "ent_clinic",               name: "ENT",               icon: "👂", color: "from-violet-500 to-purple-600" },
+  { id: "eye_clinic",               name: "Eye",               icon: "👁️", color: "from-indigo-500 to-blue-600" },
+  { id: "gynecology_clinic",        name: "Gynecology",        icon: "🌸", color: "from-pink-500 to-rose-500" },
+  { id: "internal_medicine_female", name: "Internal (Female)", icon: "💊", color: "from-fuchsia-500 to-pink-600" },
+  { id: "internal_medicine_male",   name: "Internal (Male)",   icon: "💊", color: "from-blue-500 to-indigo-600" },
+  { id: "neurology_clinic",         name: "Neurology",         icon: "🧠", color: "from-purple-500 to-violet-600" },
+  { id: "neurosurgery_clinic",      name: "Neurosurgery",      icon: "⚕️", color: "from-slate-600 to-gray-700" },
+  { id: "nutrition_clinic",         name: "Nutrition",         icon: "🥗", color: "from-green-500 to-emerald-600" },
+  { id: "orthopedic_clinic",        name: "Orthopedic",        icon: "🦴", color: "from-orange-500 to-amber-600" },
+  { id: "physiotherapy_clinic",     name: "Physiotherapy",     icon: "🏃", color: "from-lime-500 to-green-600" },
+  { id: "surgery_clinic",           name: "Surgery",           icon: "🔬", color: "from-red-500 to-rose-600" },
+  { id: "urology_clinic",           name: "Urology",           icon: "💧", color: "from-cyan-500 to-sky-600" },
 ];
 
-type Slot = {
-  id: string;
-  time: string;
-  date: string;
-  capacity: number;
-  maxCapacity: number;
-};
+type Slot = { id: string; time: string; date: string; capacity: number; maxCapacity: number };
 type SlotsByDate = Record<string, Slot[]>;
 type Step = "clinics" | "booking" | "success";
-
 type ActiveAppointment = {
-  id: string;
-  clinicId: string;
-  clinicName: string;
-  date: string;
-  time: string;
-  queueNumber: number;
-  slotId: string;
+  id: string; clinicId: string; clinicName: string; clinicIcon: string;
+  date: string; time: string; queueNumber: number; slotId: string;
 };
 
+// ─── helpers ─────────────────────────────────────────────────────────────────
+const formatDate = (d: string) =>
+  new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function AppointmentBooking() {
   const navigate = useNavigate();
 
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
+  const [currentUser, setCurrentUser]     = useState<any>(null);
+  const [isAdmin, setIsAdmin]             = useState(false);
+  const [authChecked, setAuthChecked]     = useState(false);
 
   const [selectedClinic, setSelectedClinic] = useState<(typeof CLINICS)[0] | null>(null);
-  const [slotsByDate, setSlotsByDate] = useState<SlotsByDate>({});
-  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsByDate, setSlotsByDate]       = useState<SlotsByDate>({});
+  const [slotsLoading, setSlotsLoading]     = useState(false);
+  const [selectedDate, setSelectedDate]     = useState("");
+  const [selectedSlot, setSelectedSlot]     = useState<Slot | null>(null);
 
-  const [selectedDate, setSelectedDate] = useState<string>("");
-  const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
-
-  const [step, setStep] = useState<Step>("clinics");
-  const [booking, setBooking] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [step, setStep]                   = useState<Step>("clinics");
+  const [booking, setBooking]             = useState(false);
+  const [showConfirm, setShowConfirm]     = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
+  const [cancelling, setCancelling]       = useState(false);
 
   const [activeAppointment, setActiveAppointment] = useState<ActiveAppointment | null>(null);
   const [appointmentLoading, setAppointmentLoading] = useState(false);
+  const [successInfo, setSuccessInfo] = useState<{ queueNumber: number; clinicName: string; clinicIcon: string; date: string; time: string } | null>(null);
 
-  const [successInfo, setSuccessInfo] = useState<{
-    queueNumber: number;
-    clinicName: string;
-    date: string;
-    time: string;
-  } | null>(null);
-
-  // Auth + admin check
+  // ── Auth + role guard ────────────────────────────────────────────────────
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user) {
         try {
+          // Doctor? → redirect to their dashboard
+          const doctorDoc = await getDoc(doc(db, "doctors", user.uid));
+          if (doctorDoc.exists() && doctorDoc.data().role === "doctor") {
+            navigate("/doctor-dashboard", { replace: true });
+            return;
+          }
+          // Users collection
           const userDoc = await getDoc(doc(db, "users", user.uid));
-          if (userDoc.exists() && userDoc.data().role === "admin") {
-            setIsAdmin(true);
+          if (userDoc.exists()) {
+            const role = userDoc.data().role;
+            if (role === "admin") setIsAdmin(true);
+            else if (role !== "patient") {
+              navigate("/unauthorized", { replace: true });
+              return;
+            }
           }
         } catch (_) {}
       }
       setAuthChecked(true);
     });
     return () => unsub();
-  }, []);
+  }, [navigate]);
 
-  // Fetch user's active appointment
+  // ── Active appointment ───────────────────────────────────────────────────
   const fetchActiveAppointment = useCallback(async () => {
     if (!currentUser) return;
     setAppointmentLoading(true);
     try {
-      const q = query(
+      const snap = await getDocs(query(
         collection(db, "appointments"),
         where("patientId", "==", currentUser.uid),
         where("status", "==", "upcoming")
-      );
-      const snap = await getDocs(q);
+      ));
       if (!snap.empty) {
-        const d = snap.docs[0];
-        const data = d.data();
+        const d = snap.docs[0]; const data = d.data();
         const clinic = CLINICS.find((c) => c.id === data.clinicId);
         setActiveAppointment({
-          id: d.id,
-          clinicId: data.clinicId,
+          id: d.id, clinicId: data.clinicId,
           clinicName: clinic?.name ?? data.clinicId,
-          date: data.date,
-          time: data.time,
-          queueNumber: data.queueNumber,
-          slotId: data.slotId,
+          clinicIcon: clinic?.icon ?? "🏥",
+          date: data.date, time: data.time,
+          queueNumber: data.queueNumber, slotId: data.slotId,
         });
-      } else {
-        setActiveAppointment(null);
-      }
+      } else setActiveAppointment(null);
     } catch (_) {}
     setAppointmentLoading(false);
   }, [currentUser]);
 
-  useEffect(() => {
-    if (currentUser) fetchActiveAppointment();
-  }, [currentUser, fetchActiveAppointment]);
+  useEffect(() => { if (currentUser) fetchActiveAppointment(); }, [currentUser, fetchActiveAppointment]);
 
-  // Real-time slots listener (only available slots, no Fridays)
+  // ── Slots listener ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!selectedClinic) return;
-
-    setSlotsLoading(true);
-    setSlotsByDate({});
-    setSelectedDate("");
-    setSelectedSlot(null);
-
-    const q = query(
-      collection(db, "clinicSlots"),
-      where("clinicId", "==", selectedClinic.id),
-      where("isAvailable", "==", true)
-    );
-
-    const unsub = onSnapshot(q, (snapshot) => {
-      const grouped: SlotsByDate = {};
-      snapshot.docs.forEach((d) => {
-        const data = d.data();
-        // Skip Fridays (getDay() === 5)
-        const dayOfWeek = new Date(data.date + "T00:00:00").getDay();
-        if (dayOfWeek === 5) return;
-
-        const slot: Slot = {
-          id: d.id,
-          time: data.time,
-          date: data.date,
-          capacity: data.capacity ?? 0,
-          maxCapacity: data.maxCapacity ?? 10,
+    setSlotsLoading(true); setSlotsByDate({}); setSelectedDate(""); setSelectedSlot(null);
+    const unsub = onSnapshot(
+      query(collection(db, "clinicSlots"), where("clinicId", "==", selectedClinic.id), where("isAvailable", "==", true)),
+      (snapshot) => {
+        const grouped: SlotsByDate = {};
+        snapshot.docs.forEach((d) => {
+          const data = d.data();
+          if (new Date(data.date + "T00:00:00").getDay() === 5) return;
+          const slot: Slot = { id: d.id, time: data.time, date: data.date, capacity: data.capacity ?? 0, maxCapacity: data.maxCapacity ?? 10 };
+          if (!grouped[data.date]) grouped[data.date] = [];
+          grouped[data.date].push(slot);
+        });
+        const toMin = (t: string) => {
+          const [time, p] = t.split(" "); let [h, m] = time.split(":").map(Number);
+          if (p === "PM" && h !== 12) h += 12; if (p === "AM" && h === 12) h = 0;
+          return h * 60 + m;
         };
-        if (!grouped[data.date]) grouped[data.date] = [];
-        grouped[data.date].push(slot);
-      });
-
-      // Sort times within each date
-      const timeToMin = (t: string) => {
-        const [time, period] = t.split(" ");
-        let [h, m] = time.split(":").map(Number);
-        if (period === "PM" && h !== 12) h += 12;
-        if (period === "AM" && h === 12) h = 0;
-        return h * 60 + m;
-      };
-      Object.values(grouped).forEach((slots) =>
-        slots.sort((a, b) => timeToMin(a.time) - timeToMin(b.time))
-      );
-
-      setSlotsByDate(grouped);
-      setSlotsLoading(false);
-    });
-
+        Object.values(grouped).forEach((s) => s.sort((a, b) => toMin(a.time) - toMin(b.time)));
+        setSlotsByDate(grouped); setSlotsLoading(false);
+      }
+    );
     return () => unsub();
   }, [selectedClinic]);
 
-  // Sorted dates, no Fridays, max 7 days
-  const sortedDates = Object.keys(slotsByDate)
-    .filter((d) => new Date(d + "T00:00:00").getDay() !== 5)
-    .sort()
-    .slice(0, 7);
+  const sortedDates = Object.keys(slotsByDate).filter((d) => new Date(d + "T00:00:00").getDay() !== 5).sort().slice(0, 7);
 
-  const handleSelectClinic = (clinic: (typeof CLINICS)[0]) => {
-    if (!currentUser) {
-      navigate("/login");
-      return;
-    }
-    setSelectedClinic(clinic);
-    setStep("booking");
-  };
-
-  // Transaction-based booking
+  // ── Book ────────────────────────────────────────────────────────────────
   const handleBookNow = async () => {
     if (!currentUser || !selectedClinic || !selectedDate || !selectedSlot) return;
     setBooking(true);
-
     try {
       const slotRef = doc(db, "clinicSlots", selectedSlot.id);
       let queueNumber = 0;
-
       await runTransaction(db, async (transaction) => {
-        // 1. Read slot
         const slotSnap = await transaction.get(slotRef);
         if (!slotSnap.exists()) throw new Error("Slot no longer exists.");
-
         const slotData = slotSnap.data();
         if (!slotData.isAvailable) throw new Error("This slot is no longer available.");
-
         const capacity: number = slotData.capacity ?? 0;
         const maxCapacity: number = slotData.maxCapacity ?? 10;
         if (capacity >= maxCapacity) throw new Error("This slot is fully booked.");
-
-        // 2. Check existing upcoming appointment
-        const existingSnap = await getDocs(
-          query(
-            collection(db, "appointments"),
-            where("patientId", "==", currentUser.uid),
-            where("status", "==", "upcoming")
-          )
-        );
+        const existingSnap = await getDocs(query(collection(db, "appointments"), where("patientId", "==", currentUser.uid), where("status", "==", "upcoming")));
         if (!existingSnap.empty) throw new Error("EXISTING_APPOINTMENT");
-
-        // 3. Calculate queue number
-        const queueSnap = await getDocs(
-          query(
-            collection(db, "appointments"),
-            where("clinicId", "==", selectedClinic.id),
-            where("date", "==", selectedDate)
-          )
-        );
+        const queueSnap = await getDocs(query(collection(db, "appointments"), where("clinicId", "==", selectedClinic.id), where("date", "==", selectedDate)));
         queueNumber = queueSnap.size + 1;
-
         const newCapacity = capacity + 1;
-        const nowFull = newCapacity >= maxCapacity;
-
-        // 4. Update slot
-        transaction.update(slotRef, {
-          capacity: newCapacity,
-          ...(nowFull ? { isAvailable: false } : {}),
-        });
-
-        // 5. Create appointment
+        transaction.update(slotRef, { capacity: newCapacity, ...(newCapacity >= maxCapacity ? { isAvailable: false } : {}) });
         const apptRef = doc(collection(db, "appointments"));
         transaction.set(apptRef, {
-          clinicId: selectedClinic.id,
-          patientId: currentUser.uid,
+          clinicId: selectedClinic.id, patientId: currentUser.uid,
           patientName: currentUser.displayName ?? currentUser.email,
-          slotId: selectedSlot.id,
-          date: selectedDate,
-          time: selectedSlot.time,
-          queueNumber,
-          status: "upcoming",
-          createdAt: serverTimestamp(),
+          slotId: selectedSlot.id, date: selectedDate, time: selectedSlot.time,
+          queueNumber, status: "upcoming", createdAt: serverTimestamp(),
         });
       });
-
-      setSuccessInfo({
-        queueNumber,
-        clinicName: selectedClinic.name,
-        date: selectedDate,
-        time: selectedSlot.time,
-      });
-
-      setShowConfirm(false);
-      setStep("success");
+      setSuccessInfo({ queueNumber, clinicName: selectedClinic.name, clinicIcon: selectedClinic.icon, date: selectedDate, time: selectedSlot.time });
+      setShowConfirm(false); setStep("success");
       await fetchActiveAppointment();
     } catch (err: any) {
       setShowConfirm(false);
-      if (err.message === "EXISTING_APPOINTMENT") {
-        alert("You already have an upcoming appointment. Please cancel it first.");
-      } else {
-        alert(err.message || "Booking failed. Please try again.");
-      }
-    } finally {
-      setBooking(false);
-    }
+      if (err.message === "EXISTING_APPOINTMENT") alert("You already have an upcoming appointment. Please cancel it first.");
+      else alert(err.message || "Booking failed. Please try again.");
+    } finally { setBooking(false); }
   };
 
-  // Cancel appointment — decrement capacity, re-open slot, reorder queue
+  // ── Cancel ──────────────────────────────────────────────────────────────
   const handleCancelAppointment = async () => {
     if (!activeAppointment) return;
     setCancelling(true);
-
     try {
       const slotRef = doc(db, "clinicSlots", activeAppointment.slotId);
       const apptRef = doc(db, "appointments", activeAppointment.id);
-
       await runTransaction(db, async (transaction) => {
         const slotSnap = await transaction.get(slotRef);
-
-        // Delete appointment
         transaction.delete(apptRef);
-
-        // Decrement capacity and re-open slot
         if (slotSnap.exists()) {
           const data = slotSnap.data();
-          const newCapacity = Math.max(0, (data.capacity ?? 0) - 1);
-          transaction.update(slotRef, {
-            capacity: newCapacity,
-            isAvailable: true,
-          });
+          transaction.update(slotRef, { capacity: Math.max(0, (data.capacity ?? 0) - 1), isAvailable: true });
         }
       });
-
-      // Reorder queue numbers for remaining appointments on that day
-      const remaining = await getDocs(
-        query(
-          collection(db, "appointments"),
-          where("clinicId", "==", activeAppointment.clinicId),
-          where("date", "==", activeAppointment.date),
-          where("status", "==", "upcoming")
-        )
-      );
-      const sorted = remaining.docs
-        .map((d) => ({ ref: d.ref, queue: d.data().queueNumber as number }))
-        .sort((a, b) => a.queue - b.queue);
-
-      await Promise.all(
-        sorted.map((item, idx) => updateDoc(item.ref, { queueNumber: idx + 1 }))
-      );
-
-      setActiveAppointment(null);
-      setShowCancelConfirm(false);
-    } catch (err: any) {
-      alert(err.message || "Cancellation failed. Please try again.");
-    } finally {
-      setCancelling(false);
-    }
+      const remaining = await getDocs(query(collection(db, "appointments"), where("clinicId", "==", activeAppointment.clinicId), where("date", "==", activeAppointment.date), where("status", "==", "upcoming")));
+      const sorted = remaining.docs.map((d) => ({ ref: d.ref, queue: d.data().queueNumber as number })).sort((a, b) => a.queue - b.queue);
+      await Promise.all(sorted.map((item, idx) => updateDoc(item.ref, { queueNumber: idx + 1 })));
+      setActiveAppointment(null); setShowCancelConfirm(false);
+    } catch (err: any) { alert(err.message || "Cancellation failed."); }
+    finally { setCancelling(false); }
   };
 
   const resetAll = () => {
-    setSelectedClinic(null);
-    setSelectedDate("");
-    setSelectedSlot(null);
-    setSuccessInfo(null);
-    setStep("clinics");
-    fetchActiveAppointment();
+    setSelectedClinic(null); setSelectedDate(""); setSelectedSlot(null);
+    setSuccessInfo(null); setStep("clinics"); fetchActiveAppointment();
   };
 
-  const formatDate = (d: string) =>
-    new Date(d + "T00:00:00").toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    });
-
-  if (!authChecked) {
-    return (
-      <div className="h-screen flex items-center justify-center">
-        <Loader2 className="animate-spin text-[#185ba5]" size={40} />
+  if (!authChecked) return (
+    <div className="h-screen flex items-center justify-center bg-gradient-to-br from-[#0f2544] to-[#1a3a60]">
+      <div className="text-center space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center mx-auto backdrop-blur-sm">
+          <Loader2 className="animate-spin text-white" size={28} />
+        </div>
+        <p className="text-white/60 text-sm">Loading...</p>
       </div>
-    );
-  }
+    </div>
+  );
 
+  // ── RENDER ──────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#f0f4f9]">
 
-      {/* Admin Bar */}
+      {/* Admin bar */}
       {isAdmin && (
-        <div className="bg-[#1a3a60] py-2 px-6 flex justify-end">
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="flex items-center gap-2 bg-white text-[#1a3a60] px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors text-sm"
-          >
-            <LayoutDashboard size={16} />
-            Dashboard
+        <div className="bg-[#0f2544] py-2 px-6 flex justify-end">
+          <button onClick={() => navigate("/dashboard")}
+            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-all border border-white/20">
+            <LayoutDashboard size={15} /> Dashboard
           </button>
         </div>
       )}
 
-      {/* Page Header */}
-      <div className="bg-gradient-to-r from-[#1a3a60] to-[#185ba5] text-white py-10 px-4">
-        <div className="max-w-4xl mx-auto">
+      {/* ── HERO HEADER ─────────────────────────────────────────── */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-[#0f2544] via-[#1a3a60] to-[#185ba5] text-white">
+        {/* decorative circles */}
+        <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-white/5 blur-3xl" />
+        <div className="absolute -bottom-10 -left-10 w-60 h-60 rounded-full bg-blue-400/10 blur-2xl" />
+
+        <div className="relative max-w-4xl mx-auto px-4 py-12">
           {step !== "clinics" && (
-            <button
-              onClick={resetAll}
-              className="flex items-center gap-1 text-blue-200 hover:text-white text-sm mb-4 transition-colors"
-            >
-              <ChevronLeft size={16} />
+            <button onClick={resetAll} className="flex items-center gap-1 text-blue-300 hover:text-white text-sm mb-5 transition-colors group">
+              <ChevronLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
               Back to clinics
             </button>
           )}
-          <h1 className="text-3xl font-bold">
-            {step === "clinics" && "Book an Appointment"}
-            {step === "booking" && `${selectedClinic?.name} Clinic`}
-            {step === "success" && "Booking Confirmed"}
-          </h1>
-          <p className="text-blue-100 mt-1 text-sm">
-            {step === "clinics" && "Choose a clinic to get started"}
-            {step === "booking" && "Select an available date and time"}
-            {step === "success" && "Your appointment has been successfully booked"}
-          </p>
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="bg-white/10 backdrop-blur-sm border border-white/20 text-blue-200 text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1.5">
+                  <Sparkles size={11} /> Smart Clinic
+                </span>
+              </div>
+              <h1 className="text-3xl md:text-4xl font-black leading-tight tracking-tight">
+                {step === "clinics" && <>Book Your<br /><span className="text-blue-300">Appointment</span></>}
+                {step === "booking" && <>{selectedClinic?.icon} {selectedClinic?.name}<br /><span className="text-blue-300 text-2xl font-bold">Select a Slot</span></>}
+                {step === "success" && <>Booking<br /><span className="text-green-300">Confirmed ✓</span></>}
+              </h1>
+              <p className="text-blue-200/70 mt-2 text-sm">
+                {step === "clinics" && "16 clinics · Available 6 days a week · Instant confirmation"}
+                {step === "booking" && "Pick a date and time that works for you"}
+                {step === "success" && "Your queue number is reserved — see you soon!"}
+              </p>
+            </div>
+
+            {step === "clinics" && (
+              <div className="hidden sm:flex flex-col items-end gap-1 text-right">
+                <div className="flex items-center gap-1.5 text-blue-300 text-xs"><MapPin size={12} /> All specialties</div>
+                <div className="text-3xl font-black text-white">16<span className="text-blue-300 text-lg font-bold"> clinics</span></div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
 
-        {/* Active Appointment Banner — only on clinics step */}
+        {/* ── Active appointment banner ── */}
         {step === "clinics" && currentUser && (
           <>
             {appointmentLoading ? (
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
-                <Loader2 size={18} className="animate-spin text-gray-400" />
-                <span className="text-gray-400 text-sm">Checking your appointments...</span>
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3 animate-pulse">
+                <div className="w-8 h-8 rounded-xl bg-gray-100" />
+                <div className="h-4 bg-gray-100 rounded w-48" />
               </div>
             ) : activeAppointment ? (
-              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5">
-                <div className="flex items-start justify-between gap-4 flex-wrap">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-[#185ba5] flex items-center justify-center flex-shrink-0">
-                      <CalendarDays size={18} className="text-white" />
-                    </div>
+              <div className="relative overflow-hidden bg-gradient-to-r from-[#1a3a60] to-[#185ba5] rounded-2xl p-5 shadow-lg shadow-blue-900/20">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+                <div className="relative flex items-start justify-between gap-4 flex-wrap">
+                  <div className="flex items-start gap-4">
+                    <div className="text-3xl leading-none mt-1">{activeAppointment.clinicIcon}</div>
                     <div>
-                      <p className="font-semibold text-[#1a3a60] text-sm">Upcoming Appointment</p>
-                      <p className="text-[#185ba5] font-bold mt-0.5">{activeAppointment.clinicName}</p>
-                      <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-gray-500">
-                        <span>{formatDate(activeAppointment.date)}</span>
-                        <span>·</span>
-                        <span>{activeAppointment.time}</span>
-                        <span>·</span>
-                        <span className="font-semibold text-[#185ba5]">Queue #{activeAppointment.queueNumber}</span>
+                      <p className="text-blue-200 text-xs font-semibold uppercase tracking-wider mb-0.5">Upcoming Appointment</p>
+                      <p className="text-white font-black text-lg leading-tight">{activeAppointment.clinicName}</p>
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                        <span className="bg-white/15 text-white text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1">
+                          <CalendarDays size={11} /> {formatDate(activeAppointment.date)}
+                        </span>
+                        <span className="bg-white/15 text-white text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1">
+                          <Clock size={11} /> {activeAppointment.time}
+                        </span>
+                        <span className="bg-yellow-400/20 text-yellow-300 text-xs font-black px-2.5 py-1 rounded-full">
+                          Queue #{activeAppointment.queueNumber}
+                        </span>
                       </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setShowCancelConfirm(true)}
-                    className="flex items-center gap-1.5 text-red-500 hover:text-red-700 text-xs font-semibold border border-red-200 hover:border-red-400 bg-white rounded-lg px-3 py-2 transition-all flex-shrink-0"
-                  >
-                    <XCircle size={14} />
-                    Cancel
+                  <button onClick={() => setShowCancelConfirm(true)}
+                    className="flex items-center gap-1.5 bg-red-500/20 hover:bg-red-500/40 text-red-300 hover:text-red-200 text-xs font-semibold border border-red-400/30 rounded-xl px-3 py-2 transition-all flex-shrink-0">
+                    <XCircle size={13} /> Cancel
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
-                  <CheckCircle2 size={16} className="text-green-500" />
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle2 size={18} className="text-green-500" />
                 </div>
-                <p className="text-gray-500 text-sm">No upcoming appointments — pick a clinic below!</p>
+                <div>
+                  <p className="text-gray-700 text-sm font-semibold">No upcoming appointments</p>
+                  <p className="text-gray-400 text-xs mt-0.5">Pick a clinic below to get started</p>
+                </div>
               </div>
             )}
           </>
         )}
 
-        {/* Step 1 — Clinic Grid */}
+        {/* ── STEP 1: Clinic Grid ── */}
         {step === "clinics" && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {CLINICS.map((clinic) => (
-              <button
-                key={clinic.id}
-                onClick={() => handleSelectClinic(clinic)}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all p-5 text-left group"
-              >
-                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center mb-3 group-hover:bg-blue-100 transition-colors">
-                  <CalendarDays size={20} className="text-[#185ba5]" />
-                </div>
-                <p className="font-semibold text-[#1a3a60] text-sm leading-snug">{clinic.name}</p>
-                <p className="text-xs text-gray-400 mt-1">Book →</p>
-              </button>
-            ))}
+          <div>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Choose a Clinic</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {CLINICS.map((clinic, i) => (
+                <button key={clinic.id} onClick={() => { if (!currentUser) { navigate("/login"); return; } setSelectedClinic(clinic); setStep("booking"); }}
+                  style={{ animationDelay: `${i * 30}ms` }}
+                  className="group relative bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 p-5 text-left overflow-hidden"
+                >
+                  {/* hover gradient overlay */}
+                  <div className={`absolute inset-0 bg-gradient-to-br ${clinic.color} opacity-0 group-hover:opacity-5 transition-opacity duration-200 rounded-2xl`} />
+                  <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${clinic.color} flex items-center justify-center mb-3 text-xl shadow-md group-hover:scale-110 transition-transform duration-200`}>
+                    {clinic.icon}
+                  </div>
+                  <p className="font-bold text-[#1a3a60] text-sm leading-snug">{clinic.name}</p>
+                  <p className="text-xs text-gray-400 mt-1 flex items-center gap-1 group-hover:text-[#185ba5] transition-colors">
+                    Book now <span className="group-hover:translate-x-0.5 transition-transform inline-block">→</span>
+                  </p>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Step 2 — Date & Time Picker */}
+        {/* ── STEP 2: Date & Time ── */}
         {step === "booking" && selectedClinic && (
-          <div className="space-y-6">
+          <div className="space-y-5">
             {slotsLoading ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="animate-spin text-[#185ba5]" size={36} />
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <Loader2 className="animate-spin text-[#185ba5]" size={32} />
+                <p className="text-gray-400 text-sm">Loading available slots...</p>
               </div>
             ) : sortedDates.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
-                <CalendarDays size={40} className="text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 font-medium">No available slots right now</p>
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
+                <CalendarDays size={40} className="text-gray-200 mx-auto mb-3" />
+                <p className="text-gray-500 font-semibold">No available slots right now</p>
                 <p className="text-gray-400 text-sm mt-1">Please check back later</p>
               </div>
             ) : (
               <>
-                {/* Date Row */}
-                <div>
+                {/* Date selector */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                   <div className="flex items-center gap-2 mb-4">
-                    <CalendarDays size={18} className="text-[#185ba5]" />
-                    <h2 className="font-semibold text-[#1a3a60]">Select Date</h2>
-                    <span className="text-xs text-gray-400 ml-1">(Fri excluded)</span>
+                    <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                      <CalendarDays size={15} className="text-[#185ba5]" />
+                    </div>
+                    <h2 className="font-bold text-[#1a3a60] text-sm">Select Date</h2>
+                    <span className="text-xs text-gray-300 ml-1">· Fri excluded</span>
                   </div>
-                  <div className="flex gap-3 overflow-x-auto pb-2">
+                  <div className="flex gap-2.5 overflow-x-auto pb-1">
                     {sortedDates.map((date) => {
                       const d = new Date(date + "T00:00:00");
                       const isSelected = selectedDate === date;
-                      const slotsCount = slotsByDate[date]?.length ?? 0;
+                      const count = slotsByDate[date]?.length ?? 0;
                       return (
-                        <button
-                          key={date}
-                          onClick={() => { setSelectedDate(date); setSelectedSlot(null); }}
-                          className={`flex-shrink-0 flex flex-col items-center rounded-2xl border px-5 py-3 min-w-[72px] transition-all ${
+                        <button key={date} onClick={() => { setSelectedDate(date); setSelectedSlot(null); }}
+                          className={`flex-shrink-0 flex flex-col items-center rounded-2xl px-4 py-3 min-w-[68px] transition-all duration-150 border ${
                             isSelected
-                              ? "bg-[#185ba5] text-white border-[#185ba5] shadow-md shadow-blue-200"
-                              : "bg-white text-[#1a3a60] border-gray-200 hover:border-blue-300"
-                          }`}
-                        >
-                          <span className={`text-xs font-medium ${isSelected ? "text-blue-200" : "text-gray-400"}`}>
-                            {d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()}
+                              ? "bg-gradient-to-b from-[#185ba5] to-[#1a3a60] text-white border-transparent shadow-lg shadow-blue-300/30 scale-105"
+                              : "bg-white text-[#1a3a60] border-gray-200 hover:border-blue-200 hover:shadow-sm"
+                          }`}>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider ${isSelected ? "text-blue-200" : "text-gray-400"}`}>
+                            {d.toLocaleDateString("en-US", { weekday: "short" })}
                           </span>
-                          <span className="text-xl font-bold leading-tight">{d.getDate()}</span>
-                          <span className={`text-xs ${isSelected ? "text-blue-200" : "text-gray-400"}`}>
+                          <span className="text-2xl font-black leading-tight">{d.getDate()}</span>
+                          <span className={`text-[10px] ${isSelected ? "text-blue-200" : "text-gray-400"}`}>
                             {d.toLocaleDateString("en-US", { month: "short" })}
                           </span>
-                          <span className={`text-xs mt-1 font-semibold ${isSelected ? "text-blue-100" : "text-[#185ba5]"}`}>
-                            {slotsCount} slot{slotsCount !== 1 ? "s" : ""}
+                          <span className={`text-[10px] mt-1 font-bold ${isSelected ? "text-yellow-300" : "text-[#185ba5]"}`}>
+                            {count} slots
                           </span>
                         </button>
                       );
@@ -547,31 +418,30 @@ export default function AppointmentBooking() {
                   </div>
                 </div>
 
-                {/* Time Grid */}
+                {/* Time selector */}
                 {selectedDate && (
-                  <div>
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                     <div className="flex items-center gap-2 mb-4">
-                      <Clock size={18} className="text-[#185ba5]" />
-                      <h2 className="font-semibold text-[#1a3a60]">Select Time</h2>
+                      <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                        <Clock size={15} className="text-[#185ba5]" />
+                      </div>
+                      <h2 className="font-bold text-[#1a3a60] text-sm">Select Time</h2>
                     </div>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
                       {(slotsByDate[selectedDate] ?? []).map((slot) => {
                         const isSelected = selectedSlot?.id === slot.id;
                         const spotsLeft = slot.maxCapacity - slot.capacity;
-                        const isAlmostFull = spotsLeft <= 3;
+                        const almostFull = spotsLeft <= 3;
                         return (
-                          <button
-                            key={slot.id}
-                            onClick={() => setSelectedSlot(slot)}
-                            className={`flex flex-col items-center rounded-xl border px-3 py-3 transition-all ${
+                          <button key={slot.id} onClick={() => setSelectedSlot(slot)}
+                            className={`flex flex-col items-center rounded-xl border px-3 py-3.5 transition-all duration-150 ${
                               isSelected
-                                ? "bg-[#185ba5] text-white border-[#185ba5] shadow-md shadow-blue-200"
-                                : "bg-white text-[#1a3a60] border-gray-200 hover:border-blue-300"
-                            }`}
-                          >
-                            <span className="text-sm font-semibold">{slot.time}</span>
-                            <span className={`text-xs mt-1 ${
-                              isSelected ? "text-blue-200" : isAlmostFull ? "text-orange-500 font-semibold" : "text-gray-400"
+                                ? "bg-gradient-to-b from-[#185ba5] to-[#1a3a60] text-white border-transparent shadow-lg shadow-blue-300/30 scale-105"
+                                : "bg-white text-[#1a3a60] border-gray-200 hover:border-blue-200 hover:shadow-sm"
+                            }`}>
+                            <span className="text-sm font-bold">{slot.time}</span>
+                            <span className={`text-[10px] mt-1 font-semibold ${
+                              isSelected ? "text-blue-200" : almostFull ? "text-orange-500" : "text-gray-400"
                             }`}>
                               {spotsLeft} left
                             </span>
@@ -582,50 +452,46 @@ export default function AppointmentBooking() {
                   </div>
                 )}
 
-                {/* Summary */}
+                {/* Summary card */}
                 {selectedDate && selectedSlot && (
-                  <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-6">
-                    <h3 className="font-semibold text-[#1a3a60] mb-4">Appointment Summary</h3>
-                    <div className="space-y-3 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Clinic</span>
-                        <span className="font-semibold text-[#1a3a60]">{selectedClinic.name}</span>
+                  <div className="bg-white rounded-2xl border border-blue-100 shadow-sm overflow-hidden">
+                    <div className={`h-1.5 bg-gradient-to-r ${selectedClinic.color}`} />
+                    <div className="p-6">
+                      <div className="flex items-center gap-3 mb-5">
+                        <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${selectedClinic.color} flex items-center justify-center text-2xl shadow-md`}>
+                          {selectedClinic.icon}
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400 font-medium">Appointment Summary</p>
+                          <p className="font-black text-[#1a3a60] text-lg">{selectedClinic.name}</p>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Date</span>
-                        <span className="font-semibold text-[#1a3a60]">{formatDate(selectedDate)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Time</span>
-                        <span className="font-semibold text-[#1a3a60]">{selectedSlot.time}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Capacity</span>
-                        <span className={`font-semibold ${
-                          selectedSlot.maxCapacity - selectedSlot.capacity <= 3
-                            ? "text-orange-500"
-                            : "text-green-600"
-                        }`}>
-                          {selectedSlot.maxCapacity - selectedSlot.capacity} / {selectedSlot.maxCapacity} spots left
-                        </span>
-                      </div>
-                    </div>
 
-                    {activeAppointment ? (
-                      <div className="mt-5 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
-                        <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
-                        <span>
-                          You already have an appointment at {activeAppointment.clinicName}. Cancel it first to book a new one.
-                        </span>
+                      <div className="grid grid-cols-3 gap-3 mb-5">
+                        {[
+                          { label: "Date", value: formatDate(selectedDate), icon: <CalendarDays size={13} /> },
+                          { label: "Time", value: selectedSlot.time, icon: <Clock size={13} /> },
+                          { label: "Spots Left", value: `${selectedSlot.maxCapacity - selectedSlot.capacity}/${selectedSlot.maxCapacity}`, icon: <Sparkles size={13} /> },
+                        ].map(({ label, value, icon }) => (
+                          <div key={label} className="bg-gray-50 rounded-xl p-3 text-center">
+                            <div className="flex items-center justify-center gap-1 text-gray-400 mb-1">{icon}<span className="text-[10px] font-semibold uppercase tracking-wide">{label}</span></div>
+                            <p className="font-bold text-[#1a3a60] text-sm">{value}</p>
+                          </div>
+                        ))}
                       </div>
-                    ) : (
-                      <Button
-                        onClick={() => setShowConfirm(true)}
-                        className="w-full mt-5 bg-[#185ba5] hover:bg-[#134885] text-white rounded-xl py-5 font-semibold shadow-lg shadow-blue-200"
-                      >
-                        Book Now
-                      </Button>
-                    )}
+
+                      {activeAppointment ? (
+                        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
+                          <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+                          <span>You already have an appointment at <strong>{activeAppointment.clinicName}</strong>. Cancel it first.</span>
+                        </div>
+                      ) : (
+                        <button onClick={() => setShowConfirm(true)}
+                          className={`w-full py-4 rounded-xl font-black text-white text-sm bg-gradient-to-r ${selectedClinic.color} hover:opacity-90 shadow-lg transition-all active:scale-[0.98]`}>
+                          Confirm Booking →
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
               </>
@@ -633,133 +499,98 @@ export default function AppointmentBooking() {
           </div>
         )}
 
-        {/* Step 3 — Success */}
+        {/* ── STEP 3: Success ── */}
         {step === "success" && successInfo && (
-          <div className="flex items-center justify-center py-6">
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-10 text-center max-w-sm w-full">
-              <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-5">
-                <CheckCircle2 size={36} className="text-green-500" />
-              </div>
-              <h2 className="text-xl font-bold text-[#1a3a60] mb-1">Booking Confirmed!</h2>
-              <p className="text-gray-500 text-sm mb-6">Your appointment details</p>
-              <div className="bg-blue-50 rounded-2xl p-6 mb-6 text-left space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Clinic</span>
-                  <span className="font-semibold text-[#1a3a60]">{successInfo.clinicName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Date</span>
-                  <span className="font-semibold text-[#1a3a60]">{formatDate(successInfo.date)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Time</span>
-                  <span className="font-semibold text-[#1a3a60]">{successInfo.time}</span>
-                </div>
-                <div className="border-t border-blue-100 pt-3 flex justify-between items-center">
-                  <span className="text-gray-500">Queue Number</span>
-                  <span className="text-2xl font-bold text-[#185ba5]">#{successInfo.queueNumber}</span>
+          <div className="flex items-center justify-center py-4">
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-8 text-center max-w-sm w-full">
+              <div className="relative w-20 h-20 mx-auto mb-5">
+                <div className="absolute inset-0 rounded-full bg-green-100 animate-ping opacity-30" />
+                <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-200">
+                  <span className="text-3xl">{successInfo.clinicIcon}</span>
                 </div>
               </div>
-              <Button
-                onClick={resetAll}
-                className="w-full bg-[#185ba5] hover:bg-[#134885] text-white rounded-xl py-5 font-semibold"
-              >
-                Done
-              </Button>
+
+              <h2 className="text-2xl font-black text-[#1a3a60] mb-1">You're Booked!</h2>
+              <p className="text-gray-400 text-sm mb-6">Your appointment is confirmed</p>
+
+              <div className="bg-gradient-to-br from-[#0f2544] to-[#185ba5] rounded-2xl p-5 mb-5 text-left space-y-3">
+                {[
+                  { label: "Clinic", value: successInfo.clinicName },
+                  { label: "Date", value: formatDate(successInfo.date) },
+                  { label: "Time", value: successInfo.time },
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex justify-between text-sm">
+                    <span className="text-blue-300">{label}</span>
+                    <span className="font-bold text-white">{value}</span>
+                  </div>
+                ))}
+                <div className="border-t border-white/10 pt-3 flex justify-between items-center">
+                  <span className="text-blue-300 text-sm">Your Queue #</span>
+                  <span className="text-4xl font-black text-yellow-300">#{successInfo.queueNumber}</span>
+                </div>
+              </div>
+
+              <button onClick={resetAll}
+                className="w-full py-4 rounded-xl font-bold text-[#1a3a60] bg-gray-100 hover:bg-gray-200 transition-colors text-sm">
+                Back to Clinics
+              </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Confirm Booking Dialog */}
+      {/* ── Confirm Dialog ── */}
       <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Confirm Booking</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-sm rounded-2xl">
+          <DialogHeader><DialogTitle className="text-[#1a3a60]">Confirm Booking</DialogTitle></DialogHeader>
           <div className="py-2 space-y-3 text-sm">
             <div className="bg-gray-50 rounded-xl p-4 space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Clinic</span>
-                <span className="font-medium text-[#1a3a60]">{selectedClinic?.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Date</span>
-                <span className="font-medium text-[#1a3a60]">{selectedDate ? formatDate(selectedDate) : ""}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Time</span>
-                <span className="font-medium text-[#1a3a60]">{selectedSlot?.time}</span>
-              </div>
+              {[
+                { label: "Clinic", value: selectedClinic?.name },
+                { label: "Date", value: selectedDate ? formatDate(selectedDate) : "" },
+                { label: "Time", value: selectedSlot?.time },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex justify-between">
+                  <span className="text-gray-500">{label}</span>
+                  <span className="font-semibold text-[#1a3a60]">{value}</span>
+                </div>
+              ))}
             </div>
-            <p className="text-gray-400 text-xs text-center">
-              You can only have one active appointment at a time.
-            </p>
+            <p className="text-gray-400 text-xs text-center">One active appointment at a time.</p>
           </div>
-          <div className="flex gap-3 pt-1">
-            <Button variant="outline" className="flex-1" onClick={() => setShowConfirm(false)} disabled={booking}>
-              Back
-            </Button>
-            <Button
-              className="flex-1 bg-[#185ba5] hover:bg-[#134885] text-white"
-              onClick={handleBookNow}
-              disabled={booking}
-            >
-              {booking ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 size={16} className="animate-spin" /> Booking...
-                </span>
-              ) : "Confirm"}
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setShowConfirm(false)} disabled={booking}>Back</Button>
+            <Button className="flex-1 bg-[#185ba5] hover:bg-[#134885] text-white" onClick={handleBookNow} disabled={booking}>
+              {booking ? <span className="flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> Booking...</span> : "Confirm"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Cancel Appointment Dialog */}
+      {/* ── Cancel Dialog ── */}
       <Dialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Cancel Appointment</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-sm rounded-2xl">
+          <DialogHeader><DialogTitle className="text-[#1a3a60]">Cancel Appointment</DialogTitle></DialogHeader>
           <div className="py-2">
             <div className="bg-red-50 border border-red-100 rounded-xl p-4 space-y-2 text-sm mb-3">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Clinic</span>
-                <span className="font-medium text-[#1a3a60]">{activeAppointment?.clinicName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Date</span>
-                <span className="font-medium text-[#1a3a60]">
-                  {activeAppointment ? formatDate(activeAppointment.date) : ""}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Time</span>
-                <span className="font-medium text-[#1a3a60]">{activeAppointment?.time}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Queue #</span>
-                <span className="font-semibold text-[#185ba5]">#{activeAppointment?.queueNumber}</span>
-              </div>
+              {[
+                { label: "Clinic", value: activeAppointment?.clinicName },
+                { label: "Date", value: activeAppointment ? formatDate(activeAppointment.date) : "" },
+                { label: "Time", value: activeAppointment?.time },
+                { label: "Queue #", value: `#${activeAppointment?.queueNumber}` },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex justify-between">
+                  <span className="text-gray-500">{label}</span>
+                  <span className="font-semibold text-[#1a3a60]">{value}</span>
+                </div>
+              ))}
             </div>
-            <p className="text-gray-500 text-xs text-center">
-              This slot will be freed up and the queue will be adjusted for others.
-            </p>
+            <p className="text-gray-400 text-xs text-center">Slot will be freed and queue adjusted automatically.</p>
           </div>
-          <div className="flex gap-3 pt-1">
-            <Button variant="outline" className="flex-1" onClick={() => setShowCancelConfirm(false)} disabled={cancelling}>
-              Keep it
-            </Button>
-            <Button
-              className="flex-1 bg-red-500 hover:bg-red-600 text-white"
-              onClick={handleCancelAppointment}
-              disabled={cancelling}
-            >
-              {cancelling ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 size={16} className="animate-spin" /> Cancelling...
-                </span>
-              ) : "Yes, Cancel"}
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setShowCancelConfirm(false)} disabled={cancelling}>Keep it</Button>
+            <Button className="flex-1 bg-red-500 hover:bg-red-600 text-white" onClick={handleCancelAppointment} disabled={cancelling}>
+              {cancelling ? <span className="flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> Cancelling...</span> : "Yes, Cancel"}
             </Button>
           </div>
         </DialogContent>
