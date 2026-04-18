@@ -284,7 +284,6 @@ export default function AppointmentBooking() {
   const pageBg      = dk ? "#06091a"   : "#f0f4f9";
   const cardBg      = dk ? "rgba(255,255,255,0.03)" : "#ffffff";
   const cardBorder  = dk ? "rgba(255,255,255,0.08)" : "#e5e7eb";
-  const heroBg      = dk ? "transparent" : "linear-gradient(135deg,#1a3a60 0%,#185ba5 100%)";
   const textPrimary = dk ? "rgba(255,255,255,0.85)" : "#1a3a60";
   const textMuted   = dk ? "rgba(255,255,255,0.35)" : "#6b7280";
   const textFaint   = dk ? "rgba(255,255,255,0.18)" : "#9ca3af";
