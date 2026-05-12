@@ -259,7 +259,7 @@ export default function AppointmentBooking() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [userProfile, setUserProfile]       = useState<UserProfile | null>(null);
-  const [profileLoading, setProfileLoading] = useState(false);
+  const [, setProfileLoading] = useState(false);
   const [photoFile, setPhotoFile]           = useState<File | null>(null);
   const [photoPreview, setPhotoPreview]     = useState<string | null>(null);
   const [uploading, setUploading]           = useState(false);
