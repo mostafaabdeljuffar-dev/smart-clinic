@@ -17,10 +17,8 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// 2. تفعيل الحماية باستخدام الـ Site Key اللي جبته
 if (typeof window !== "undefined") {
   initializeAppCheck(app, {
-    // استبدل النص اللي تحت بالـ Site Key الحقيقي بتاعك
     provider: new ReCaptchaV3Provider('6LfBPeosAAAAAFL6vD6-2bDDQ5vChWJagvq5o6HD'),
     isTokenAutoRefreshEnabled: true,
   });
