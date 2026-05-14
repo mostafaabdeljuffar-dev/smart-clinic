@@ -2,6 +2,8 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+// 1. استيراد مكتبات App Check
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAytb8YpWNaE_8-nJVhMttZThIMZSEBGS4",
@@ -14,6 +16,15 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+// 2. تفعيل الحماية باستخدام الـ Site Key اللي جبته
+if (typeof window !== "undefined") {
+  initializeAppCheck(app, {
+    // استبدل النص اللي تحت بالـ Site Key الحقيقي بتاعك
+    provider: new ReCaptchaV3Provider('6LfBPeosAAAAAFL6vD6-2bDDQ5vChWJagvq5o6HD'),
+    isTokenAutoRefreshEnabled: true,
+  });
+}
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
