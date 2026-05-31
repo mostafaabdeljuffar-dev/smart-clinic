@@ -367,14 +367,14 @@ export default function AppointmentBooking() {
   const newMsgs = [...chatMsgs, userMsg];
   setChatMsgs(newMsgs); setChatInput(""); setChatLoading(true);
   try {
-    const idToken = await currentUser?.getIdToken();
-    if (!idToken) throw new Error("Not authenticated");
+    const uid = currentUser?.uid;
+    if (!uid) throw new Error("Not authenticated");
 
     const res = await fetch("/api/chatbot", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        idToken,
+        uid,
         message,
         history: newMsgs.slice(1, -1).map((m) => ({ role: m.role, content: m.content })),
       }),
@@ -406,7 +406,6 @@ export default function AppointmentBooking() {
   }
   setChatLoading(false);
 };
-
   /* review */
   const handleSubmitReview = async()=>{
     if(!currentUser||!reviewClinicId||reviewRating===0) return;
