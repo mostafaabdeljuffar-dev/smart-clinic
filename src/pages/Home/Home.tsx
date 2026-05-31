@@ -130,32 +130,6 @@ const CLINICS = [
   { id: "urology_clinic",           en: "Urology",           ar: "المسالك البولية",  icon: "💧", grad: "from-cyan-500 to-sky-600",      glow: "#06b6d4" },
 ];
 
-const SYSTEM_PROMPT = `أنت مساعد ذكي لمستشفى الطلبة الجامعي اوعي تجاوب اي حاجه غير بالي انا سمحتهولك يعني الاقسام والمواعيد والعيادات بس كده متشغلش دماغك - نظام العيادات الذكية.
-
-## معلومات المستشفى:
-- المستشفى: مستشفى الطلبة الجامعي
-- الخدمة: متاحة لطلاب الجامعة فقط، ولازم يكون معاك الكارنيه الجامعي
-- مواعيد العمل: من السبت للخميس، من 8 الصبح لـ 1 الضهر
-- الجمعة: إجازة
-
-## العيادات المتاحة (16 عيادة):
-1. 🫀 عيادة القلب | 2. 🫁 عيادة الصدر | 3. 🦷 عيادة الأسنان | 4. ✨ عيادة الجلدية
-5. 👂 أنف وأذن وحنجرة | 6. 👁️ عيادة العيون | 7. 🌸 النساء والتوليد
-8. 💊 باطنة نساء | 9. 💊 باطنة رجال | 10. 🧠 عيادة الأعصاب
-11. ⚕️ جراحة الأعصاب | 12. 🥗 عيادة التغذية | 13. 🦴 عيادة العظام
-14. 🏃 العلاج الطبيعي | 15. 🔬 عيادة الجراحة | 16. 💧 المسالك البولية
-
-## طريقة الحجز:
-- أونلاين من خلال التطبيق: اختر العيادة ← التاريخ ← الميعاد ← تأكيد
-- بتاخد رقم في الطابور فورًا - موعد واحد بس في نفس الوقت
-
-## تعليمات:
-- رد باللهجة المصرية البسيطة والودية
-- خليك مختصر ومفيد
-- متديش تشخيصات طبية أو وصفات دوا أبدًا
-- لو مش طالب: الخدمة للطلاب فقط وبتحتاج كارنيه
-- لو سؤال خارج نطاق المستشفى: قوله يتواصل مع الإدارة
-- لو بيتألم: روح الطوارئ فورًا`;
 
 const QUICK_Q_AR = ["إيه العيادات المتاحة؟","إزاي أحجز موعد؟","المواعيد من إمتى لإمتى؟","هل محتاج كارنيه؟","أقدر أحجز أكتر من موعد؟","إزاي ألغي الموعد؟"];
 const QUICK_Q_EN = ["What clinics are available?","How do I book?","Working hours?","Do I need a student ID?","Multiple appointments?","How to cancel?"];
@@ -387,36 +361,51 @@ export default function AppointmentBooking() {
   };
 
   /* chat */
-  const sendChat = async(message:string)=>{
-    if(!message.trim()||chatLoading) return;
-    const userMsg:ChatMsg={role:"user",content:message};
-    const newMsgs=[...chatMsgs,userMsg];
-    setChatMsgs(newMsgs); setChatInput(""); setChatLoading(true);
-    try {
-      const res=await fetch("https://openrouter.ai/api/v1/chat/completions",{
-        method:"POST",
-        headers:{
-          "Content-Type":"application/json",
-          "Authorization":`Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY}`,
-          "HTTP-Referer":window.location.origin,
-          "X-Title":"Smart Clinic NovaMed"
-        },
-        body:JSON.stringify({
-          model:"google/gemini-2.0-flash-001",
-          messages:[{role:"system",content:SYSTEM_PROMPT},...newMsgs.map((m)=>({role:m.role,content:m.content}))],
-          max_tokens:500,temperature:0.7
-        }),
-      });
-      if(!res.ok){const e=await res.json();throw new Error(JSON.stringify(e));}
-      const data=await res.json();
-      const reply=data.choices?.[0]?.message?.content??"معلش، حصل خطأ. حاول تاني! 🙏";
-      setChatMsgs((p)=>[...p,{role:"assistant",content:reply}]);
-      if(!chatOpen) setChatUnread((n)=>n+1);
-    } catch {
-      setChatMsgs((p)=>[...p,{role:"assistant",content:"معلش، في مشكلة في الاتصال. حاول تاني! 🙏"}]);
+ const sendChat = async (message: string) => {
+  if (!message.trim() || chatLoading) return;
+  const userMsg: ChatMsg = { role: "user", content: message };
+  const newMsgs = [...chatMsgs, userMsg];
+  setChatMsgs(newMsgs); setChatInput(""); setChatLoading(true);
+  try {
+    const idToken = await currentUser?.getIdToken();
+    if (!idToken) throw new Error("Not authenticated");
+
+    const res = await fetch("/api/chatbot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        idToken,
+        message,
+        history: newMsgs.slice(1, -1).map((m) => ({ role: m.role, content: m.content })),
+      }),
+    });
+
+    const data = await res.json();
+
+    if (res.status === 429) {
+      setChatMsgs((p) => [...p, {
+        role: "assistant",
+        content: lang === "ar"
+          ? "عذراً، استخدمت الـ 5 رسايل اليومية. 🌙 عود غداً!"
+          : "Sorry, you've used all 5 daily messages. 🌙 Come back tomorrow!",
+      }]);
+      setChatLoading(false);
+      return;
     }
-    setChatLoading(false);
-  };
+
+    if (!res.ok) throw new Error(data.error || "Error");
+
+    setChatMsgs((p) => [...p, { role: "assistant", content: data.reply }]);
+    if (!chatOpen) setChatUnread((n) => n + 1);
+
+  } catch {
+    setChatMsgs((p) => [...p, {
+      role: "assistant",
+      content: lang === "ar" ? "معلش، في مشكلة في الاتصال. حاول تاني! 🙏" : "Sorry, connection error. Try again! 🙏",
+    }]);
+  }
+  setChatLoading(false);
+};
 
   /* review */
   const handleSubmitReview = async()=>{

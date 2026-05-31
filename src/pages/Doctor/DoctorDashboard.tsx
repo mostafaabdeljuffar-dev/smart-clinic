@@ -9,8 +9,7 @@ import { Button } from "@/components/ui/button";
 import { db } from "@/firebase";
 import {
   collection, query, where, onSnapshot,
-  doc, getDoc, deleteDoc, addDoc,
-  getDocs, updateDoc, serverTimestamp,
+  doc, getDoc, deleteDoc, getDocs, updateDoc,
 } from "firebase/firestore";
 import { useAuth } from "@/auth";
 
@@ -30,7 +29,6 @@ interface Appointment {
 // ── Date helpers ──────────────────────────────────────────────────────────────
 const todayDate = new Date();
 const IS_FRIDAY = todayDate.getDay() === 5;
-
 const START_DATE = IS_FRIDAY
   ? new Date(todayDate.getTime() + 24 * 60 * 60 * 1000)
   : todayDate;
@@ -57,89 +55,54 @@ const formatDateShort = (d: string) =>
 const formatClinicName = (id: string) =>
   id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
-const isToday = (d: string) => d === todayDate.toISOString().split("T")[0];
+const isToday    = (d: string) => d === todayDate.toISOString().split("T")[0];
 const isTomorrow = (d: string) => {
   const t = new Date(todayDate);
   t.setDate(t.getDate() + 1);
   return d === t.toISOString().split("T")[0];
 };
 const getDayLabel = (d: string) => {
-  if (isToday(d)) return "اليوم";
+  if (isToday(d))    return "اليوم";
   if (isTomorrow(d)) return "غداً";
   return null;
 };
 
-// ── Email via Firestore "mail" collection (Trigger Email Extension) ────────────
+// ── Email helpers (via /api/send-email) ───────────────────────────────────────
+async function sendEmail(payload: {
+  type: "confirm" | "cancel";
+  to_email: string;
+  patient_name: string;
+  clinic_name: string;
+  date: string;
+  time: string;
+  queue?: number;
+}) {
+  try {
+    const res = await fetch("/api/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`Email API error: ${res.status}`);
+  } catch (err) {
+    console.error("Failed to send email:", err);
+  }
+}
+
 async function getPatientEmail(patientId: string): Promise<string | null> {
   try {
     const snap = await getDoc(doc(db, "users", patientId));
-    return snap.exists() ? (snap.data().email ?? null) : null;
+    if (!snap.exists()) return null;
+    return snap.data().email ?? null;
   } catch { return null; }
 }
-
-async function sendEmail(to: string, subject: string, html: string) {
-  try {
-    await addDoc(collection(db, "mail"), {
-      to,
-      message: { subject, html },
-      createdAt: serverTimestamp(),
-    });
-  } catch (err) { console.error("Failed to queue email:", err); }
-}
-
-const confirmEmailHtml = (
-  patientName: string, clinicName: string,
-  date: string, time: string, queue: number
-) => `
-<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#f9fafb;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb">
-  <div style="background:linear-gradient(135deg,#1a3a60,#185ba5);padding:32px 28px;text-align:center">
-    <h1 style="color:#fff;margin:0;font-size:22px;font-weight:700">✅ تم تأكيد موعدك</h1>
-    <p style="color:#bfdbfe;margin:8px 0 0;font-size:14px">مستشفى الطلبة الجامعي</p>
-  </div>
-  <div style="padding:28px">
-    <p style="color:#374151;font-size:15px;margin:0 0 20px">أهلاً <strong>${patientName}</strong>،</p>
-    <p style="color:#374151;font-size:14px;margin:0 0 20px">تم <strong style="color:#16a34a">تأكيد موعدك</strong> من قِبل الطبيب.</p>
-    <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:20px;margin-bottom:20px;direction:rtl">
-      <table style="width:100%;border-collapse:collapse">
-        <tr><td style="color:#6b7280;font-size:13px;padding:5px 0">العيادة</td><td style="color:#1a3a60;font-weight:600;font-size:13px;text-align:left">${clinicName}</td></tr>
-        <tr><td style="color:#6b7280;font-size:13px;padding:5px 0">التاريخ</td><td style="color:#1a3a60;font-weight:600;font-size:13px;text-align:left">${date}</td></tr>
-        <tr><td style="color:#6b7280;font-size:13px;padding:5px 0">الوقت</td><td style="color:#1a3a60;font-weight:600;font-size:13px;text-align:left">${time}</td></tr>
-        <tr><td style="color:#6b7280;font-size:13px;padding:5px 0">رقم الطابور</td><td style="color:#185ba5;font-weight:800;font-size:18px;text-align:left">#${queue}</td></tr>
-      </table>
-    </div>
-    <p style="color:#9ca3af;font-size:12px;text-align:center;margin:0">مستشفى الطلبة الجامعي · إشعار تلقائي</p>
-  </div>
-</div>`;
-
-const cancelEmailHtml = (
-  patientName: string, clinicName: string,
-  date: string, time: string
-) => `
-<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#f9fafb;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb">
-  <div style="background:linear-gradient(135deg,#991b1b,#dc2626);padding:32px 28px;text-align:center">
-    <h1 style="color:#fff;margin:0;font-size:22px;font-weight:700">❌ تم إلغاء موعدك</h1>
-    <p style="color:#fecaca;margin:8px 0 0;font-size:14px">مستشفى الطلبة الجامعي</p>
-  </div>
-  <div style="padding:28px">
-    <p style="color:#374151;font-size:15px;margin:0 0 20px">أهلاً <strong>${patientName}</strong>،</p>
-    <p style="color:#374151;font-size:14px;margin:0 0 20px">تم <strong style="color:#dc2626">إلغاء موعدك</strong> من قِبل الطبيب. يُرجى الحجز مجدداً في أقرب وقت.</p>
-    <div style="background:#fff5f5;border:1px solid #fecaca;border-radius:12px;padding:20px;margin-bottom:20px;direction:rtl">
-      <table style="width:100%;border-collapse:collapse">
-        <tr><td style="color:#6b7280;font-size:13px;padding:5px 0">العيادة</td><td style="color:#1a3a60;font-weight:600;font-size:13px;text-align:left">${clinicName}</td></tr>
-        <tr><td style="color:#6b7280;font-size:13px;padding:5px 0">التاريخ</td><td style="color:#1a3a60;font-weight:600;font-size:13px;text-align:left">${date}</td></tr>
-        <tr><td style="color:#6b7280;font-size:13px;padding:5px 0">الوقت</td><td style="color:#dc2626;font-weight:600;font-size:13px;text-align:left">${time}</td></tr>
-      </table>
-    </div>
-    <p style="color:#9ca3af;font-size:12px;text-align:center;margin:0">مستشفى الطلبة الجامعي · إشعار تلقائي</p>
-  </div>
-</div>`;
 
 // ════════════════════════════════════════════════════════════════════════════
 export default function DoctorDashboard() {
   const { user } = useAuth();
 
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [clinicId, setClinicId]         = useState<string | null>(null);
+  const [appointments,  setAppointments]  = useState<Appointment[]>([]);
+  const [clinicId,      setClinicId]      = useState<string | null>(null);
   const [clinicLoading, setClinicLoading] = useState(true);
 
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; appointment: Appointment | null }>({ open: false, appointment: null });
@@ -158,7 +121,7 @@ export default function DoctorDashboard() {
     })();
   }, [user?.userId]);
 
-  // ── Real-time listener ──────────────────────────────────────────────────
+  // ── Real-time appointments listener ────────────────────────────────────
   useEffect(() => {
     if (!clinicId) return;
     const q = query(
@@ -170,45 +133,57 @@ export default function DoctorDashboard() {
     const unsub = onSnapshot(q, (snap) => {
       const list: Appointment[] = snap.docs
         .map((d) => ({ id: d.id, ...(d.data() as Omit<Appointment, "id">) }))
-        .sort((a, b) => a.date !== b.date ? a.date.localeCompare(b.date) : a.queueNumber - b.queueNumber);
+        .sort((a, b) =>
+          a.date !== b.date
+            ? a.date.localeCompare(b.date)
+            : a.queueNumber - b.queueNumber
+        );
       setAppointments(list);
     });
     return () => unsub();
   }, [clinicId]);
 
+  // ── Group by date ───────────────────────────────────────────────────────
   const groupedByDate = WEEK_DATES.reduce((acc, date) => {
     acc[date] = appointments.filter((a) => a.date === date);
     return acc;
   }, {} as Record<string, Appointment[]>);
 
-  // ── Confirm ─────────────────────────────────────────────────────────────
+  // ── Reorder queue after delete ──────────────────────────────────────────
+  const reorderQueue = async (date: string) => {
+    const remaining = await getDocs(query(
+      collection(db, "appointments"),
+      where("clinicId", "==", clinicId!),
+      where("date",     "==", date),
+      where("status",   "==", "upcoming")
+    ));
+    const sorted = remaining.docs
+      .map((d) => ({ ref: d.ref, q: d.data().queueNumber as number }))
+      .sort((a, b) => a.q - b.q);
+    await Promise.all(sorted.map((item, i) => updateDoc(item.ref, { queueNumber: i + 1 })));
+  };
+
+  // ── Confirm (done) ──────────────────────────────────────────────────────
   const handleConfirm = async () => {
     const appt = confirmModal.appointment;
     if (!appt) return;
     setActionLoading(true);
     try {
       await deleteDoc(doc(db, "appointments", appt.id));
-
-      const remaining = await getDocs(query(
-        collection(db, "appointments"),
-        where("clinicId", "==", clinicId!),
-        where("date",     "==", appt.date),
-        where("status",   "==", "upcoming")
-      ));
-      const sorted = remaining.docs
-        .map((d) => ({ ref: d.ref, q: d.data().queueNumber as number }))
-        .sort((a, b) => a.q - b.q);
-      await Promise.all(sorted.map((item, i) => updateDoc(item.ref, { queueNumber: i + 1 })));
+      await reorderQueue(appt.date);
 
       const email = await getPatientEmail(appt.patientId);
       if (email) {
-        await sendEmail(
-          email,
-          "✅ تم تأكيد موعدك — مستشفى الطلبة الجامعي",
-          confirmEmailHtml(appt.patientName, formatClinicName(clinicId!), formatDateLong(appt.date), appt.time, appt.queueNumber)
-        );
+        await sendEmail({
+          type: "confirm",
+          to_email: email,
+          patient_name: appt.patientName,
+          clinic_name:  formatClinicName(clinicId!),
+          date:  appt.date,
+          time:  appt.time,
+          queue: appt.queueNumber,
+        });
       }
-
       setConfirmModal({ open: false, appointment: null });
     } catch (err) { console.error(err); }
     finally { setActionLoading(false); }
@@ -222,8 +197,9 @@ export default function DoctorDashboard() {
     try {
       await deleteDoc(doc(db, "appointments", appt.id));
 
+      // Free the slot
       if (appt.slotId) {
-        const slotRef = doc(db, "clinicSlots", appt.slotId);
+        const slotRef  = doc(db, "clinicSlots", appt.slotId);
         const slotSnap = await getDoc(slotRef);
         if (slotSnap.exists()) {
           const cap = slotSnap.data().capacity ?? 0;
@@ -231,26 +207,19 @@ export default function DoctorDashboard() {
         }
       }
 
-      const remaining = await getDocs(query(
-        collection(db, "appointments"),
-        where("clinicId", "==", clinicId!),
-        where("date",     "==", appt.date),
-        where("status",   "==", "upcoming")
-      ));
-      const sorted = remaining.docs
-        .map((d) => ({ ref: d.ref, q: d.data().queueNumber as number }))
-        .sort((a, b) => a.q - b.q);
-      await Promise.all(sorted.map((item, i) => updateDoc(item.ref, { queueNumber: i + 1 })));
+      await reorderQueue(appt.date);
 
       const email = await getPatientEmail(appt.patientId);
       if (email) {
-        await sendEmail(
-          email,
-          "❌ تم إلغاء موعدك — مستشفى الطلبة الجامعي",
-          cancelEmailHtml(appt.patientName, formatClinicName(clinicId!), formatDateLong(appt.date), appt.time)
-        );
+        await sendEmail({
+          type: "cancel",
+          to_email: email,
+          patient_name: appt.patientName,
+          clinic_name:  formatClinicName(clinicId!),
+          date: appt.date,
+          time: appt.time,
+        });
       }
-
       setCancelModal({ open: false, appointment: null });
     } catch (err) { console.error(err); }
     finally { setActionLoading(false); }
@@ -322,18 +291,28 @@ export default function DoctorDashboard() {
         {/* Week appointments grouped by day */}
         <div className="space-y-4">
           {WEEK_DATES.map((date) => {
-            const dayAppts = groupedByDate[date];
+            const dayAppts      = groupedByDate[date];
             if (dayAppts.length === 0) return null;
-            const dayLabel = getDayLabel(date);
+            const dayLabel      = getDayLabel(date);
             const todayHighlight = isToday(date);
+
             return (
-              <div key={date} className={`bg-white rounded-3xl shadow-xl overflow-hidden ${todayHighlight ? "ring-2 ring-blue-400 shadow-blue-900/10" : "shadow-blue-900/5"}`}>
-                <div className={`flex items-center justify-between px-6 py-4 border-b border-gray-100 ${todayHighlight ? "bg-gradient-to-r from-[#1a3a60]/10 to-blue-50" : "bg-gradient-to-r from-[#1a3a60]/5 to-transparent"}`}>
+              <div key={date} className={`bg-white rounded-3xl shadow-xl overflow-hidden ${
+                todayHighlight ? "ring-2 ring-blue-400 shadow-blue-900/10" : "shadow-blue-900/5"
+              }`}>
+                {/* Day header */}
+                <div className={`flex items-center justify-between px-6 py-4 border-b border-gray-100 ${
+                  todayHighlight
+                    ? "bg-gradient-to-r from-[#1a3a60]/10 to-blue-50"
+                    : "bg-gradient-to-r from-[#1a3a60]/5 to-transparent"
+                }`}>
                   <h2 className="text-base font-bold text-[#1a3a60] flex items-center gap-2">
                     <Calendar size={18} className="text-blue-500" />
                     {formatDateLong(date)}
                     {dayLabel && (
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${todayHighlight ? "bg-blue-500 text-white" : "bg-amber-100 text-amber-700"}`}>
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                        todayHighlight ? "bg-blue-500 text-white" : "bg-amber-100 text-amber-700"
+                      }`}>
                         {dayLabel}
                       </span>
                     )}
@@ -342,6 +321,8 @@ export default function DoctorDashboard() {
                     {dayAppts.length} patients
                   </span>
                 </div>
+
+                {/* Appointments rows */}
                 <div className="divide-y divide-gray-50">
                   {dayAppts.map((app) => (
                     <div key={app.id} className="flex items-center justify-between px-6 py-4 hover:bg-blue-50/30 transition-colors flex-wrap gap-3">
@@ -366,15 +347,24 @@ export default function DoctorDashboard() {
                           </div>
                         </div>
                       </div>
+
                       <div className="flex items-center gap-3">
-                        <span className="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 font-medium capitalize">{app.status}</span>
+                        <span className="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 font-medium capitalize">
+                          {app.status}
+                        </span>
                         <div className="flex gap-2">
-                          <button onClick={() => setConfirmModal({ open: true, appointment: app })} title="Mark as Done"
-                            className="w-9 h-9 bg-green-500 text-white rounded-xl hover:bg-green-600 flex items-center justify-center shadow-sm transition-all hover:scale-105 active:scale-95">
+                          <button
+                            onClick={() => setConfirmModal({ open: true, appointment: app })}
+                            title="Mark as Done"
+                            className="w-9 h-9 bg-green-500 text-white rounded-xl hover:bg-green-600 flex items-center justify-center shadow-sm transition-all hover:scale-105 active:scale-95"
+                          >
                             <Check size={16} />
                           </button>
-                          <button onClick={() => setCancelModal({ open: true, appointment: app })} title="Cancel"
-                            className="w-9 h-9 bg-red-500 text-white rounded-xl hover:bg-red-600 flex items-center justify-center shadow-sm transition-all hover:scale-105 active:scale-95">
+                          <button
+                            onClick={() => setCancelModal({ open: true, appointment: app })}
+                            title="Cancel"
+                            className="w-9 h-9 bg-red-500 text-white rounded-xl hover:bg-red-600 flex items-center justify-center shadow-sm transition-all hover:scale-105 active:scale-95"
+                          >
                             <X size={16} />
                           </button>
                         </div>
@@ -388,7 +378,7 @@ export default function DoctorDashboard() {
         </div>
       </div>
 
-      {/* Confirm Modal */}
+      {/* ── Confirm Modal ── */}
       <Dialog open={confirmModal.open} onOpenChange={(open) => !actionLoading && setConfirmModal({ open, appointment: null })}>
         <DialogContent className="rounded-2xl">
           <DialogHeader>
@@ -397,17 +387,27 @@ export default function DoctorDashboard() {
               <div className="space-y-2 pt-1">
                 {confirmModal.appointment && (
                   <div className="bg-green-50 border border-green-200 rounded-xl p-3 mt-2 space-y-1.5">
-                    <div className="flex items-center gap-2 text-green-800 font-semibold text-sm"><User size={14} />{confirmModal.appointment.patientName}</div>
-                    <div className="flex items-center gap-2 text-green-700 text-sm"><Clock size={13} />{confirmModal.appointment.time}</div>
-                    <div className="flex items-center gap-2 text-green-700 text-sm"><Hash size={13} />Queue #{confirmModal.appointment.queueNumber}</div>
+                    <div className="flex items-center gap-2 text-green-800 font-semibold text-sm">
+                      <User size={14} /> {confirmModal.appointment.patientName}
+                    </div>
+                    <div className="flex items-center gap-2 text-green-700 text-sm">
+                      <Clock size={13} /> {confirmModal.appointment.time}
+                    </div>
+                    <div className="flex items-center gap-2 text-green-700 text-sm">
+                      <Hash size={13} /> Queue #{confirmModal.appointment.queueNumber}
+                    </div>
                   </div>
                 )}
-                <p className="text-sm text-gray-400 mt-2">This will remove the appointment and send a confirmation email to the patient.</p>
+                <p className="text-sm text-gray-400 mt-2">
+                  This will remove the appointment and send a confirmation email to the patient.
+                </p>
               </div>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setConfirmModal({ open: false, appointment: null })} disabled={actionLoading}>Back</Button>
+            <Button variant="outline" onClick={() => setConfirmModal({ open: false, appointment: null })} disabled={actionLoading}>
+              Back
+            </Button>
             <Button onClick={handleConfirm} className="bg-green-500 hover:bg-green-600 text-white" disabled={actionLoading}>
               {actionLoading ? <Loader2 size={15} className="animate-spin mr-2" /> : <Check size={15} className="mr-2" />}
               Mark as Done
@@ -416,7 +416,7 @@ export default function DoctorDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Cancel Modal */}
+      {/* ── Cancel Modal ── */}
       <Dialog open={cancelModal.open} onOpenChange={(open) => !actionLoading && setCancelModal({ open, appointment: null })}>
         <DialogContent className="rounded-2xl">
           <DialogHeader>
@@ -425,17 +425,27 @@ export default function DoctorDashboard() {
               <div className="space-y-2 pt-1">
                 {cancelModal.appointment && (
                   <div className="bg-red-50 border border-red-200 rounded-xl p-3 mt-2 space-y-1.5">
-                    <div className="flex items-center gap-2 text-red-800 font-semibold text-sm"><User size={14} />{cancelModal.appointment.patientName}</div>
-                    <div className="flex items-center gap-2 text-red-700 text-sm"><Clock size={13} />{cancelModal.appointment.time}</div>
-                    <div className="flex items-center gap-2 text-red-700 text-sm"><Hash size={13} />Queue #{cancelModal.appointment.queueNumber}</div>
+                    <div className="flex items-center gap-2 text-red-800 font-semibold text-sm">
+                      <User size={14} /> {cancelModal.appointment.patientName}
+                    </div>
+                    <div className="flex items-center gap-2 text-red-700 text-sm">
+                      <Clock size={13} /> {cancelModal.appointment.time}
+                    </div>
+                    <div className="flex items-center gap-2 text-red-700 text-sm">
+                      <Hash size={13} /> Queue #{cancelModal.appointment.queueNumber}
+                    </div>
                   </div>
                 )}
-                <p className="text-sm text-gray-400 mt-2">The patient will receive a cancellation email and lose their queue spot.</p>
+                <p className="text-sm text-gray-400 mt-2">
+                  The patient will receive a cancellation email and lose their queue spot.
+                </p>
               </div>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setCancelModal({ open: false, appointment: null })} disabled={actionLoading}>Keep It</Button>
+            <Button variant="outline" onClick={() => setCancelModal({ open: false, appointment: null })} disabled={actionLoading}>
+              Keep It
+            </Button>
             <Button variant="destructive" onClick={handleCancel} disabled={actionLoading}>
               {actionLoading ? <Loader2 size={15} className="animate-spin mr-2" /> : <X size={15} className="mr-2" />}
               Cancel Appointment
