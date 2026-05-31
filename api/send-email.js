@@ -1,10 +1,10 @@
-import * as admin from "firebase-admin";
+const admin = require("firebase-admin");
 
 // ── Initialize Firebase Admin (once) ─────────────────────────────────────────
 if (!admin.apps.length) {
-const serviceAccount = JSON.parse(
-  process.env.FIREBASE_SERVICE_ACCOUNT.replace(/\\n/g, "\n")
-);
+  const serviceAccount = JSON.parse(
+    process.env.FIREBASE_SERVICE_ACCOUNT.replace(/\\n/g, "\n")
+  );
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
   });
@@ -22,14 +22,13 @@ const formatClinicName = (id) =>
   id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 // ── Handler ───────────────────────────────────────────────────────────────────
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   const { idToken, appointmentId, type } = req.body;
 
-  // 1. Validate inputs
   if (!idToken || !appointmentId || !type) {
     return res.status(400).json({ error: "Missing required fields" });
   }
@@ -38,30 +37,30 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 2. Verify Firebase ID Token
+    // 1. Verify Firebase ID Token
     const decoded = await admin.auth().verifyIdToken(idToken);
     const doctorUid = decoded.uid;
 
-    // 3. Check role = "doctor"
+    // 2. Check role = "doctor"
     const doctorSnap = await db.collection("doctors").doc(doctorUid).get();
     if (!doctorSnap.exists || doctorSnap.data().role !== "doctor") {
       return res.status(403).json({ error: "Not authorized" });
     }
     const clinicId = doctorSnap.data().clinicId;
 
-    // 4. Fetch appointment from Firestore
+    // 3. Fetch appointment
     const apptSnap = await db.collection("appointments").doc(appointmentId).get();
     if (!apptSnap.exists) {
       return res.status(404).json({ error: "Appointment not found" });
     }
     const appt = apptSnap.data();
 
-    // 5. Confirm appointment belongs to this doctor's clinic
+    // 4. Confirm appointment belongs to this clinic
     if (appt.clinicId !== clinicId) {
       return res.status(403).json({ error: "Appointment does not belong to your clinic" });
     }
 
-    // 6. Fetch patient email
+    // 5. Fetch patient email
     const patientSnap = await db.collection("users").doc(appt.patientId).get();
     if (!patientSnap.exists) {
       return res.status(404).json({ error: "Patient not found" });
@@ -71,7 +70,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Patient has no email" });
     }
 
-    // 7. Send via EmailJS REST API (no private key needed)
+    // 6. Send via EmailJS REST API
     const templateId = type === "confirm"
       ? process.env.EMAILJS_TEMPLATE_CONFIRM
       : process.env.EMAILJS_TEMPLATE_CANCEL;
@@ -97,7 +96,6 @@ export default async function handler(req, res) {
     if (!emailRes.ok) {
       const errText = await emailRes.text();
       console.error("EmailJS error:", errText);
-      // Don't fail the whole request if email fails — appointment is already processed
       return res.status(200).json({ success: true, emailSent: false });
     }
 
@@ -115,4 +113,4 @@ export default async function handler(req, res) {
 
     return res.status(500).json({ error: "Internal server error" });
   }
-}
+};

@@ -1,10 +1,11 @@
-import * as admin from "firebase-admin";
+const admin = require("firebase-admin");
 
 // ── Initialize Firebase Admin (once) ─────────────────────────────────────────
 if (!admin.apps.length) {
-const serviceAccount = JSON.parse(
-  process.env.FIREBASE_SERVICE_ACCOUNT.replace(/\\n/g, "\n")
-);  admin.initializeApp({
+  const serviceAccount = JSON.parse(
+    process.env.FIREBASE_SERVICE_ACCOUNT.replace(/\\n/g, "\n")
+  );
+  admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
   });
 }
@@ -14,24 +15,23 @@ const db = admin.firestore();
 const DAILY_LIMIT = 5;
 
 // ── Handler ───────────────────────────────────────────────────────────────────
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   const { idToken, message, history } = req.body;
 
-  // 1. Validate inputs
   if (!idToken || !message) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
   try {
-    // 2. Verify Firebase ID Token
+    // 1. Verify Firebase ID Token
     const decoded = await admin.auth().verifyIdToken(idToken);
     const uid = decoded.uid;
 
-    // 3. Check role — only patient or admin allowed
+    // 2. Check role — only patient or admin allowed
     const userSnap = await db.collection("users").doc(uid).get();
     if (!userSnap.exists) {
       return res.status(403).json({ error: "User not found" });
@@ -41,15 +41,14 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: "Not authorized" });
     }
 
-    // 4. Check & update daily limit
-    const today = new Date().toISOString().split("T")[0]; // "2026-05-30"
+    // 3. Check & update daily limit
+    const today = new Date().toISOString().split("T")[0];
     const limitRef = db.collection("chat_limits").doc(uid);
 
     const limitResult = await db.runTransaction(async (tx) => {
       const limitSnap = await tx.get(limitRef);
 
       if (!limitSnap.exists || limitSnap.data().resetAt !== today) {
-        // New day or first time — reset counter
         tx.set(limitRef, { count: 1, resetAt: today });
         return { allowed: true, remaining: DAILY_LIMIT - 1 };
       }
@@ -70,27 +69,27 @@ export default async function handler(req, res) {
       });
     }
 
-    // 5. Build messages array for OpenRouter
+    // 4. Build messages for OpenRouter
     const systemPrompt = process.env.CHATBOT_SYSTEM_PROMPT ||
-      "You are a helpful medical assistant for Smart Clinic. Help patients with general health questions, clinic information, and appointment guidance. Never provide specific medical diagnoses or prescriptions. Always recommend consulting a doctor for serious concerns.";
+      "You are a helpful medical assistant for Smart Clinic.";
 
     const messages = [
       { role: "system", content: systemPrompt },
-      ...(Array.isArray(history) ? history.slice(-6) : []), // last 6 messages for context
+      ...(Array.isArray(history) ? history.slice(-6) : []),
       { role: "user", content: message },
     ];
 
-    // 6. Call OpenRouter
+    // 5. Call OpenRouter
     const openRouterRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": process.env.SITE_URL || "https://smart-clinic.vercel.app",
+        "HTTP-Referer": process.env.SITE_URL || "https://smart-clinic-mu.vercel.app",
         "X-Title": "Smart Clinic Chatbot",
       },
       body: JSON.stringify({
-        model: "openai/gpt-3.5-turbo",
+        model: "google/gemini-2.0-flash-001",
         messages,
         max_tokens: 500,
         temperature: 0.7,
@@ -106,11 +105,7 @@ export default async function handler(req, res) {
     const data = await openRouterRes.json();
     const reply = data.choices?.[0]?.message?.content ?? "Sorry, I couldn't generate a response.";
 
-    // 7. Return response + remaining count
-    return res.status(200).json({
-      reply,
-      remaining: limitResult.remaining,
-    });
+    return res.status(200).json({ reply, remaining: limitResult.remaining });
 
   } catch (err) {
     console.error("chatbot error:", err);
@@ -124,4 +119,4 @@ export default async function handler(req, res) {
 
     return res.status(500).json({ error: "Internal server error" });
   }
-}
+};
