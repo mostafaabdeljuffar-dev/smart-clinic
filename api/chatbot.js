@@ -3,9 +3,14 @@ import admin from "firebase-admin";
 
 // ── Initialize Firebase Admin (once) ─────────────────────────────────────────
 if (!admin.apps.length) {
-  const serviceAccount = JSON.parse(
-    process.env.FIREBASE_SERVICE_ACCOUNT.replace(/\\n/g, "\n")
-  );
+ const serviceAccount = JSON.parse(
+  process.env.FIREBASE_SERVICE_ACCOUNT
+    .replace(/\\n/g, "\n")
+    .replace(/[\x00-\x1F\x7F]/g, (c) => {
+      if (c === "\n" || c === "\r" || c === "\t") return c;
+      return "";
+    })
+);
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
   });
