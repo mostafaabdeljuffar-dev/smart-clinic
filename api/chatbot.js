@@ -1,4 +1,5 @@
-const admin = require("firebase-admin");
+// api/chatbot.js
+import admin from "firebase-admin";
 
 // ── Initialize Firebase Admin (once) ─────────────────────────────────────────
 if (!admin.apps.length) {
@@ -11,11 +12,10 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
-
 const DAILY_LIMIT = 5;
 
 // ── Handler ───────────────────────────────────────────────────────────────────
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -27,11 +27,9 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    // 1. Verify Firebase ID Token
     const decoded = await admin.auth().verifyIdToken(idToken);
     const uid = decoded.uid;
 
-    // 2. Check role — only patient or admin allowed
     const userSnap = await db.collection("users").doc(uid).get();
     if (!userSnap.exists) {
       return res.status(403).json({ error: "User not found" });
@@ -41,7 +39,6 @@ module.exports = async function handler(req, res) {
       return res.status(403).json({ error: "Not authorized" });
     }
 
-    // 3. Check & update daily limit
     const today = new Date().toISOString().split("T")[0];
     const limitRef = db.collection("chat_limits").doc(uid);
 
@@ -69,8 +66,8 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // 4. Build messages for OpenRouter
-    const systemPrompt = process.env.CHATBOT_SYSTEM_PROMPT ||
+    const systemPrompt =
+      process.env.CHATBOT_SYSTEM_PROMPT ||
       "You are a helpful medical assistant for Smart Clinic.";
 
     const messages = [
@@ -79,11 +76,10 @@ module.exports = async function handler(req, res) {
       { role: "user", content: message },
     ];
 
-    // 5. Call OpenRouter
     const openRouterRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
         "HTTP-Referer": process.env.SITE_URL || "https://smart-clinic-mu.vercel.app",
         "X-Title": "Smart Clinic Chatbot",
@@ -103,10 +99,10 @@ module.exports = async function handler(req, res) {
     }
 
     const data = await openRouterRes.json();
-    const reply = data.choices?.[0]?.message?.content ?? "Sorry, I couldn't generate a response.";
+    const reply =
+      data.choices?.[0]?.message?.content ?? "Sorry, I couldn't generate a response.";
 
     return res.status(200).json({ reply, remaining: limitResult.remaining });
-
   } catch (err) {
     console.error("chatbot error:", err);
 
@@ -119,4 +115,4 @@ module.exports = async function handler(req, res) {
 
     return res.status(500).json({ error: "Internal server error" });
   }
-};
+}
