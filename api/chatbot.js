@@ -73,7 +73,7 @@ export default async function handler(req, res) {
         "X-Title": "Smart Clinic Chatbot",
       },
       body: JSON.stringify({
-        model: "meta-llama/llama-3.3-70b-instruct:free",
+        model: "google/gemini-2.5-flash-lite",
         messages,
         max_tokens: 500,
         temperature: 0.7,
