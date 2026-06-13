@@ -23,6 +23,10 @@ export default async function handler(req, res) {
   if (!uid || !message) {
     return res.status(400).json({ error: "Missing required fields" });
   }
+  const userSnap = await db.collection("users").doc(uid).get();
+if (!userSnap.exists) {
+  return res.status(403).json({ error: "User not found" });
+}
 
   try {
     // Check & update daily limit
@@ -73,7 +77,7 @@ export default async function handler(req, res) {
         "X-Title": "Smart Clinic Chatbot",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.0-flash-001",
+        model: "meta-llama/llama-3.3-70b-instruct:free",
         messages,
         max_tokens: 500,
         temperature: 0.7,
