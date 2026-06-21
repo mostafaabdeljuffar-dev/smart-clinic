@@ -1,3 +1,4 @@
+// api/chatbot.js
 import admin from "firebase-admin";
 
 if (!admin.apps.length) {
@@ -18,14 +19,24 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { uid, message, history } = req.body;
+  const { idToken, message, history } = req.body;
 
-  if (!uid || !message) {
+  // ← uid مجاش من الـ body خالص
+  if (!idToken || !message) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
+  // ── Verify Token ──────────────────────────────────────────────
+  let uid;
   try {
-    // Check & update daily limit
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    uid = decoded.uid;  // ← UID موثوق 100% من Firebase
+  } catch (err) {
+    return res.status(401).json({ error: "Invalid or expired token" });
+  }
+
+  // ── Rate Limit بالـ UID الأصلي ───────────────────────────────
+  try {
     const today = new Date().toISOString().split("T")[0];
     const limitRef = db.collection("chat_limits").doc(uid);
 
@@ -53,9 +64,8 @@ export default async function handler(req, res) {
       });
     }
 
-    // Send to OpenRouter
-    const systemPrompt =
-      process.env.CHATBOT_SYSTEM_PROMPT ||
+    // ── OpenRouter ────────────────────────────────────────────────
+    const systemPrompt = process.env.CHATBOT_SYSTEM_PROMPT || 
       "You are a helpful medical assistant for Smart Clinic.";
 
     const messages = [
@@ -87,8 +97,8 @@ export default async function handler(req, res) {
     }
 
     const data = await openRouterRes.json();
-    const reply =
-      data.choices?.[0]?.message?.content ?? "Sorry, I couldn't generate a response.";
+    const reply = data.choices?.[0]?.message?.content ?? 
+      "Sorry, I couldn't generate a response.";
 
     return res.status(200).json({ reply, remaining: limitResult.remaining });
 

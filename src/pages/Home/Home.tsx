@@ -367,18 +367,22 @@ export default function AppointmentBooking() {
   const newMsgs = [...chatMsgs, userMsg];
   setChatMsgs(newMsgs); setChatInput(""); setChatLoading(true);
   try {
-    const uid = currentUser?.uid;
-    if (!uid) throw new Error("Not authenticated");
+    const user = auth.currentUser;
+    if (!user) throw new Error("Not authenticated");
+
+    // ← التغيير الوحيد: جيب token بدل ما تبعت uid
+    const idToken = await user.getIdToken();
 
     const res = await fetch("/api/chatbot", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        uid,
+        idToken,   // ← بدل uid
         message,
         history: newMsgs.slice(1, -1).map((m) => ({ role: m.role, content: m.content })),
       }),
     });
+    // ... باقي الكود زي ما هو
 
     const data = await res.json();
 
