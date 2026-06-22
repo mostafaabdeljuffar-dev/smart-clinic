@@ -382,7 +382,6 @@ export default function AppointmentBooking() {
         history: newMsgs.slice(1, -1).map((m) => ({ role: m.role, content: m.content })),
       }),
     });
-    // ... باقي الكود زي ما هو
 
     const data = await res.json();
 
