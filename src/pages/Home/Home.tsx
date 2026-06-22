@@ -466,35 +466,43 @@ export default function AppointmentBooking() {
   const filteredClinics=CLINICS.filter((c)=>{ const q=searchQuery.toLowerCase().trim(); if(!q) return true; return c.en.toLowerCase().includes(q)||c.ar.includes(q); });
 
   /* book */
-  const handleBook=async()=>{
-    if(!currentUser||!selectedClinic||!selectedDate||!selectedSlot) return;
-    setBooking(true);
-    try {
-      const slotRef=doc(db,"clinicSlots",selectedSlot.id);
-      let queueNumber=0;
-      await runTransaction(db,async(tx)=>{
-        const ss=await tx.get(slotRef);
-        if(!ss.exists()) throw new Error("Slot no longer exists.");
-        const sd=ss.data();
-        if(!sd.isAvailable) throw new Error(lang==="ar"?"هذا الموعد لم يعد متاحًا.":"This slot is no longer available.");
-        const cap=sd.capacity??0,maxCap=sd.maxCapacity??10;
-        if(cap>=maxCap) throw new Error(lang==="ar"?"هذا الموعد ممتلئ.":"This slot is fully booked.");
-        const ex=await getDocs(query(collection(db,"appointments"),where("patientId","==",currentUser.uid),where("status","==","upcoming")));
-        if(!ex.empty) throw new Error("EXISTING");
-        const qs=await getDocs(query(collection(db,"appointments"),where("clinicId","==",selectedClinic.id),where("date","==",selectedDate)));
-        queueNumber=qs.size+1;
-        const newCap=cap+1;
-        tx.update(slotRef,{capacity:newCap,...(newCap>=maxCap?{isAvailable:false}:{})});
-        tx.set(doc(collection(db,"appointments")),{clinicId:selectedClinic.id,patientId:currentUser.uid,patientName:currentUser.displayName??currentUser.email,slotId:selectedSlot.id,date:selectedDate,time:selectedSlot.time,queueNumber,status:"upcoming",createdAt:serverTimestamp()});
-      });
-      setSuccessInfo({queueNumber,clinicIcon:selectedClinic.icon,clinicName:cName(selectedClinic,lang),date:selectedDate,time:selectedSlot.time});
-      setShowConfirm(false); setStep("success"); await fetchActive();
-    } catch(err:any){
+ const handleBook = async () => {
+  if (!currentUser || !selectedClinic || !selectedDate || !selectedSlot) return;
+  setBooking(true);
+  try {
+    const idToken = await currentUser.getIdToken();
+
+    const res = await fetch("/api/book", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        idToken,
+        slotId: selectedSlot.id,
+        clinicId: selectedClinic.id,
+        date: selectedDate,
+        time: selectedSlot.time,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (res.status === 409 && data.error === "EXISTING") {
+      alert(lang === "ar" ? "لديك موعد قائم بالفعل. يُرجى إلغاؤه أولًا." : "You already have an upcoming appointment.");
+    } else if (!res.ok) {
+      alert(data.error || (lang === "ar" ? "فشل الحجز." : "Booking failed."));
+    } else {
+      setSuccessInfo({ queueNumber: data.queueNumber, clinicIcon: selectedClinic.icon, clinicName: cName(selectedClinic, lang), date: selectedDate, time: selectedSlot.time });
       setShowConfirm(false);
-      if(err.message==="EXISTING") alert(lang==="ar"?"لديك موعد قائم بالفعل. يُرجى إلغاؤه أولًا.":"You already have an upcoming appointment.");
-      else alert(err.message||(lang==="ar"?"فشل الحجز.":"Booking failed."));
-    } finally{setBooking(false);}
-  };
+      setStep("success");
+      await fetchActive();
+    }
+  } catch {
+    alert(lang === "ar" ? "فشل الحجز." : "Booking failed.");
+  } finally {
+    setBooking(false);
+    setShowConfirm(false);
+  }
+};
 
   /* cancel */
   const handleCancel=async()=>{
