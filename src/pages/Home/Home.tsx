@@ -367,17 +367,15 @@ export default function AppointmentBooking() {
   const newMsgs = [...chatMsgs, userMsg];
   setChatMsgs(newMsgs); setChatInput(""); setChatLoading(true);
   try {
-    const user = auth.currentUser;
-    if (!user) throw new Error("Not authenticated");
-
-    // ← التغيير الوحيد: جيب token بدل ما تبعت uid
-    const idToken = await user.getIdToken();
+    // ← currentUser من الـ state مش من auth مباشرة
+    if (!currentUser) throw new Error("Not authenticated");
+    const idToken = await currentUser.getIdToken();  // ← currentUser مش auth.currentUser
 
     const res = await fetch("/api/chatbot", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        idToken,   // ← بدل uid
+        idToken,
         message,
         history: newMsgs.slice(1, -1).map((m) => ({ role: m.role, content: m.content })),
       }),
@@ -401,7 +399,8 @@ export default function AppointmentBooking() {
     setChatMsgs((p) => [...p, { role: "assistant", content: data.reply }]);
     if (!chatOpen) setChatUnread((n) => n + 1);
 
-  } catch {
+  } catch (err) {
+    console.error("CHAT ERROR:", err);  // ← عشان تشوف لو في error
     setChatMsgs((p) => [...p, {
       role: "assistant",
       content: lang === "ar" ? "معلش، في مشكلة في الاتصال. حاول تاني! 🙏" : "Sorry, connection error. Try again! 🙏",
@@ -409,6 +408,7 @@ export default function AppointmentBooking() {
   }
   setChatLoading(false);
 };
+
   /* review */
   const handleSubmitReview = async()=>{
     if(!currentUser||!reviewClinicId||reviewRating===0) return;
