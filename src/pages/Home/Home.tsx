@@ -505,23 +505,34 @@ export default function AppointmentBooking() {
 };
 
   /* cancel */
-  const handleCancel=async()=>{
-    if(!activeAppt) return;
-    setCancelling(true);
-    try {
-      const slotRef=doc(db,"clinicSlots",activeAppt.slotId);
-      await runTransaction(db,async(tx)=>{
-        const ss=await tx.get(slotRef);
-        tx.delete(doc(db,"appointments",activeAppt.id));
-        if(ss.exists()) tx.update(slotRef,{capacity:Math.max(0,(ss.data().capacity??0)-1),isAvailable:true});
-      });
-      const rem=await getDocs(query(collection(db,"appointments"),where("clinicId","==",activeAppt.clinicId),where("date","==",activeAppt.date),where("status","==","upcoming")));
-      const sorted=rem.docs.map((d)=>({ref:d.ref,q:d.data().queueNumber as number})).sort((a,b)=>a.q-b.q);
-      await Promise.all(sorted.map((item,i)=>updateDoc(item.ref,{queueNumber:i+1})));
-      setActiveAppt(null); setShowCancelConfirm(false);
-    } catch(err:any){alert(err.message);}
-    finally{setCancelling(false);}
-  };
+const handleCancel = async () => {
+  if (!activeAppt) return;
+  setCancelling(true);
+  try {
+    const idToken = await currentUser.getIdToken();
+
+    const res = await fetch("/api/cancel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        idToken,
+        appointmentId: activeAppt.id,
+      }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || "Failed");
+    }
+
+    setActiveAppt(null);
+    setShowCancelConfirm(false);
+  } catch (err: any) {
+    alert(err.message);
+  } finally {
+    setCancelling(false);
+  }
+};
 
   const resetAll=()=>{setSelectedClinic(null);setSelectedDate("");setSelectedSlot(null);setSuccessInfo(null);setStep("clinics");fetchActive();};
 
