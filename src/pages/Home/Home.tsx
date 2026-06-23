@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db, storage } from "@/firebase";
 import {
-  collection, query, where, onSnapshot, updateDoc,
-  doc, getDocs, getDoc, runTransaction, serverTimestamp, setDoc,
+  collection, query, where, onSnapshot,
+  doc, getDocs, getDoc, serverTimestamp, setDoc,
   arrayUnion, increment, writeBatch,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -345,7 +345,7 @@ export default function AppointmentBooking() {
     reader.onload=()=>setPhotoPreview(reader.result as string);
     reader.readAsDataURL(file);
   };
-  
+
 const handlePhotoUpload = async () => {
   if (!photoFile || !currentUser) return;
   setUploading(true);

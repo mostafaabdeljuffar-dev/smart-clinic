@@ -1,4 +1,3 @@
-import "./mock"
 import { Suspense, lazy } from "react"
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom"
 
