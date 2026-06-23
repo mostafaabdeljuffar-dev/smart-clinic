@@ -345,20 +345,22 @@ export default function AppointmentBooking() {
     reader.onload=()=>setPhotoPreview(reader.result as string);
     reader.readAsDataURL(file);
   };
-  const handlePhotoUpload = async()=>{
-    if(!photoFile||!currentUser) return;
-    setUploading(true);
-    try {
-      const storageRef=ref(storage,`uploads/${currentUser.uid}/profile_${Date.now()}`);
-      await uploadBytes(storageRef,photoFile);
-      const url=await getDownloadURL(storageRef);
-      await setDoc(doc(db,"users",currentUser.uid),{imageUrl:url},{merge:true});
-      setUserProfile((p)=>p?{...p,imageUrl:url}:p);
-      setPhotoFile(null); setPhotoPreview(null); setUploadSuccess(true);
-      setTimeout(()=>setUploadSuccess(false),3000);
-    } catch(err:any){alert(err.message);}
-    setUploading(false);
-  };
+  
+const handlePhotoUpload = async () => {
+  if (!photoFile || !currentUser) return;
+  setUploading(true);
+  try {
+    // ← اسم ثابت بدل timestamp
+    const storageRef = ref(storage, `uploads/${currentUser.uid}/profile`);
+    await uploadBytes(storageRef, photoFile);
+    const url = await getDownloadURL(storageRef);
+    await setDoc(doc(db, "users", currentUser.uid), { imageUrl: url }, { merge: true });
+    setUserProfile((p) => p ? { ...p, imageUrl: url } : p);
+    setPhotoFile(null); setPhotoPreview(null); setUploadSuccess(true);
+    setTimeout(() => setUploadSuccess(false), 3000);
+  } catch (err: any) { alert(err.message); }
+  setUploading(false);
+};
 
   /* chat */
  const sendChat = async (message: string) => {
